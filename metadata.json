@@ -1,0 +1,5 @@
+{
+  "name": "MediScan AI (Arabic)",
+  "description": "A medical imaging analysis application capable of identifying potential diseases from X-rays, MRIs, and CT scans using Gemini 2.5 Flash. Designed with an Arabic-first interface for regional accessibility.",
+  "requestFramePermissions": []
+}

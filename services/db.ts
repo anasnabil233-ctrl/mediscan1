@@ -1,0 +1,100 @@
+import { SavedRecord } from '../types';
+
+const DB_NAME = 'MediScanDB';
+const DB_VERSION = 1;
+const STORE_RECORDS = 'records';
+
+/**
+ * Initialize the IndexedDB database
+ */
+export const initDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("IndexedDB is not supported in this environment"));
+      return;
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = (event) => {
+      console.error("Database error: ", request.error);
+      reject(request.error);
+    };
+
+    request.onsuccess = (event) => {
+      resolve(request.result);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_RECORDS)) {
+        db.createObjectStore(STORE_RECORDS, { keyPath: 'id' });
+      }
+    };
+  });
+};
+
+/**
+ * Add a record to the database
+ */
+export const addRecordToDB = async (record: SavedRecord): Promise<void> => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_RECORDS], 'readwrite');
+      const store = transaction.objectStore(STORE_RECORDS);
+      const request = store.add(record);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error("Error adding record to DB:", e);
+    throw e;
+  }
+};
+
+/**
+ * Get all records from the database
+ */
+export const getAllRecordsFromDB = async (): Promise<SavedRecord[]> => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_RECORDS], 'readonly');
+      const store = transaction.objectStore(STORE_RECORDS);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const results = request.result as SavedRecord[];
+        // Sort by timestamp descending (newest first)
+        results.sort((a, b) => b.timestamp - a.timestamp);
+        resolve(results);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error("Error getting records from DB:", e);
+    return [];
+  }
+};
+
+/**
+ * Delete a record from the database
+ */
+export const deleteRecordFromDB = async (id: string): Promise<void> => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_RECORDS], 'readwrite');
+      const store = transaction.objectStore(STORE_RECORDS);
+      const request = store.delete(id);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error("Error deleting record from DB:", e);
+    throw e;
+  }
+};
