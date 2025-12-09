@@ -3,8 +3,10 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.mediscan.ai',
   appName: 'MediScan AI',
-  webDir: 'dist', // or 'build' depending on your bundler (Vite usually uses dist)
+  webDir: 'dist',
+  bundledWebRuntime: false,
   server: {
+    // Ensure we load from local files for APK, not a url
     androidScheme: 'https'
   },
   plugins: {

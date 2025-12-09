@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'mediscan-v4';
+const CACHE_NAME = 'mediscan-v5';
 const urlsToCache = [
   './',
   'index.html',
@@ -37,23 +37,18 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Cache hit - return response
         if (response) {
           return response;
         }
 
-        // Clone the request
         const fetchRequest = event.request.clone();
 
         return fetch(fetchRequest).then(
           (response) => {
-            // Check if we received a valid response
             if(!response || response.status !== 200 || response.type !== 'basic' && response.type !== 'cors') {
               return response;
             }
 
-            // Cache CDN resources (like React, Tailwind, Lucide) to allow offline usage
-            // This is crucial for PWA to work properly
             if (event.request.url.includes('cdn') || event.request.url.includes('fonts')) {
                 const responseToCache = response.clone();
                 caches.open(CACHE_NAME)

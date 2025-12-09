@@ -1,30 +1,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, AnalysisOptions } from "../types";
 
-// Safety check for API Key with fallback access to window.process
-const getApiKey = () => {
-  try {
-    // Try standard process.env (Vite replacement)
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      return process.env.API_KEY;
-    }
-    // Try global window polyfill
-    if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
-      return (window as any).process.env.API_KEY;
-    }
-  } catch (e) {
-    console.warn("Error accessing API key environment", e);
-  }
-  return '';
-};
-
-const apiKey = getApiKey();
-
-if (!apiKey) {
-  console.warn("API Key is missing! Gemini features will not work.");
-}
-
-const ai = new GoogleGenAI({ apiKey: apiKey });
+// Access API key directly from process.env as per guidelines.
+// Vite replaces this with the actual string during build.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
  * Helper to convert File to Base64
@@ -44,7 +23,7 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
 };
 
 export const analyzeMedicalImage = async (base64Image: string, mimeType: string, options?: AnalysisOptions): Promise<AnalysisResult> => {
-  if (!apiKey) {
+  if (!process.env.API_KEY) {
     throw new Error("مفتاح API غير موجود. يرجى التأكد من إعدادات التطبيق.");
   }
 
