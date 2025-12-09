@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'mediscan-v3';
+const CACHE_NAME = 'mediscan-v4';
 const urlsToCache = [
   './',
   'index.html',

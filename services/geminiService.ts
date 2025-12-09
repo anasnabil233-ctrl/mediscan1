@@ -1,8 +1,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, AnalysisOptions } from "../types";
 
-// Safety check for API Key
-const apiKey = process.env.API_KEY || '';
+// Safety check for API Key with fallback access to window.process
+const getApiKey = () => {
+  try {
+    // Try standard process.env (Vite replacement)
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return process.env.API_KEY;
+    }
+    // Try global window polyfill
+    if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
+      return (window as any).process.env.API_KEY;
+    }
+  } catch (e) {
+    console.warn("Error accessing API key environment", e);
+  }
+  return '';
+};
+
+const apiKey = getApiKey();
+
 if (!apiKey) {
   console.warn("API Key is missing! Gemini features will not work.");
 }

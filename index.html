@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>MediScan AI - Medical Image Analysis</title>
     
-    <!-- PWA Manifest - Use relative path -->
+    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3063/3063176.png">
 
@@ -22,7 +22,6 @@
         background-color: #f8fafc;
         -webkit-tap-highlight-color: transparent;
       }
-      /* Custom scrollbar for better aesthetics */
       ::-webkit-scrollbar {
         width: 8px;
       }
@@ -37,38 +36,45 @@
         background: #94a3b8; 
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "vite": "https://aistudiocdn.com/vite@^7.2.7",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
-    "@capacitor/cli": "https://aistudiocdn.com/@capacitor/cli@^8.0.0"
-  }
-}
-</script>
-</head>
-  <body>
-    <div id="root"></div>
+    <script type="importmap">
+    {
+      "imports": {
+        "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+        "react/": "https://aistudiocdn.com/react@^19.2.1/",
+        "react": "https://aistudiocdn.com/react@^19.2.1",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+        "vite": "https://aistudiocdn.com/vite@^7.2.7",
+        "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
+        "@capacitor/cli": "https://aistudiocdn.com/@capacitor/cli@^8.0.0"
+      }
+    }
+    </script>
     
-    <!-- Process Polyfill for Browser Environment -->
+    <!-- Critical: Polyfill process.env before any modules load -->
     <script>
       window.process = window.process || { env: { API_KEY: '' } };
+      
+      // Global Error Handler for debugging
+      window.onerror = function(message, source, lineno, colno, error) {
+        console.error("Global Error:", message, error);
+      };
     </script>
+  </head>
+  <body>
+    <div id="root"></div>
     
     <!-- Main Application Entry Point -->
     <script type="module" src="./index.tsx"></script>
 
     <script>
+      // Service Worker Registration
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Use relative path for SW registration
           navigator.serviceWorker.register('sw.js')
             .then(registration => {
+              // Check for updates
+              registration.update();
               console.log('SW registered: ', registration);
             })
             .catch(registrationError => {
