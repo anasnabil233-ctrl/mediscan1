@@ -26,21 +26,24 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     
-    setTimeout(() => {
-      const user = loginUser(email, password);
+    try {
+      const user = await loginUser(email, password);
       setIsLoading(false);
       
       if (user) {
         onLogin(user);
       } else {
-        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة. (كلمة المرور الافتراضية: 123)');
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
       }
-    }, 800);
+    } catch (err) {
+      setIsLoading(false);
+      setError('حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة لاحقاً.');
+    }
   };
 
   const handleVerifySubmit = (e: React.FormEvent) => {
@@ -56,8 +59,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     }
 
     setTimeout(() => {
-        // In a real app, we might verify existence here, but for security (user enumeration) we often just proceed or fake it.
-        // For this demo, we'll proceed to the reset step. Actual validation happens at the final step.
         setIsLoading(false);
         setView('forgot_reset');
     }, 800);

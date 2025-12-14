@@ -66,7 +66,7 @@
       }
     </style>
     
-    <!-- Updated Import Map: Cleaned to remove conflicts -->
+    <!-- Updated Import Map: Added Supabase -->
     <script type="importmap">
 {
   "imports": {
@@ -80,7 +80,8 @@
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^4.2.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.0.0"
+    "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.0.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3"
   }
 }
 </script>
@@ -94,6 +95,9 @@
       if (!window.process.env.API_KEY) {
         window.process.env.API_KEY = ''; 
       }
+      // Polyfill for Supabase Env Vars (Updated with actual keys)
+      if (!window.process.env.VITE_SUPABASE_URL) window.process.env.VITE_SUPABASE_URL = 'https://uxycnqyolufmlyvsbzse.supabase.co';
+      if (!window.process.env.VITE_SUPABASE_ANON_KEY) window.process.env.VITE_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4eWNucXlvbHVmbWx5dnNienNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODYyMDksImV4cCI6MjA4MTI2MjIwOX0.8LHjSU4sF_mzgmuNrVjl9jHsSZz6IMB3v9ZHtfVTslw';
 
       // Global Error Handler
       window.onerror = function(message, source, lineno, colno, error) {

@@ -1,8 +1,9 @@
-import { User } from '../types';
+import { User, UserRole } from '../types';
+import { supabase } from './supabaseClient';
 
 const USERS_KEY = 'mediscan_users';
 
-// Added default passwords '123' and phone numbers
+// Fallback Mock Data
 const MOCK_USERS: User[] = [
   { id: '1', name: 'د. أحمد محمد', email: 'admin@mediscan.ai', phoneNumber: '01000000000', password: '123', role: 'Admin', status: 'Active', lastLogin: Date.now() - 3600000 },
   { id: '2', name: 'د. سارة علي', email: 'sara@mediscan.ai', phoneNumber: '01100000000', password: '123', role: 'Doctor', status: 'Active', lastLogin: Date.now() - 86400000 },
@@ -34,18 +35,74 @@ export const getUserById = (id: string): User | undefined => {
   return getUsers().find(user => user.id === id);
 };
 
+// --- Authentication ---
+
+export const loginUser = async (email: string, password?: string): Promise<User | null> => {
+  // 1. Try Supabase Login
+  if (supabase && password) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (!error && data.user) {
+        // Fetch profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile) {
+          // Map DB profile to User type
+          return {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role as UserRole,
+            status: 'Active', // Assuming active if can login
+            phoneNumber: profile.phone_number,
+            assignedDoctorId: profile.assigned_doctor_id,
+            lastLogin: Date.now()
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase login failed, trying local...", err);
+    }
+  }
+
+  // 2. Fallback to Local Mock Data
+  console.log("Using local mock authentication");
+  const users = getUsers();
+  const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.status === 'Active');
+  
+  if (user) {
+    if (password && user.password && user.password !== password) {
+      return null;
+    }
+    user.lastLogin = Date.now();
+    saveUser(user); // Update last login in local storage
+    return user;
+  }
+  return null;
+};
+
+// --- User Management ---
+
 export const saveUser = (user: User): User[] => {
+  // Only updates local storage. 
+  // For Supabase, this would require Admin API calls which are complex for this snippet.
   const users = getUsers();
   const index = users.findIndex(u => u.id === user.id);
   
-  // If updating existing user, preserve password if not provided in update
   if (index >= 0) {
     if (!user.password) {
       user.password = users[index].password;
     }
     users[index] = user;
   } else {
-    // New user default password if not set
     if (!user.password) user.password = '123456';
     users.push(user);
   }
@@ -60,32 +117,14 @@ export const deleteUser = (id: string): User[] => {
   return users;
 };
 
-export const loginUser = (email: string, password?: string): User | null => {
-  const users = getUsers();
-  const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.status === 'Active');
-  
-  if (user) {
-    // Check password
-    if (password && user.password && user.password !== password) {
-      return null;
-    }
-
-    // Update last login
-    user.lastLogin = Date.now();
-    saveUser(user);
-    return user;
-  }
-  return null;
-};
-
 export const updatePassword = (userId: string, oldPass: string, newPass: string): { success: boolean; message: string } => {
+  // Does not sync with Supabase in this demo for simplicity
   const users = getUsers();
   const userIndex = users.findIndex(u => u.id === userId);
 
   if (userIndex === -1) return { success: false, message: 'المستخدم غير موجود' };
 
   const user = users[userIndex];
-  
   if (user.password !== oldPass) {
     return { success: false, message: 'كلمة المرور الحالية غير صحيحة' };
   }
@@ -94,7 +133,6 @@ export const updatePassword = (userId: string, oldPass: string, newPass: string)
   users[userIndex] = user;
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
   
-  // Update current session user in local storage if needed
   const currentUserJson = localStorage.getItem('mediscan_user');
   if (currentUserJson) {
       const currentUser = JSON.parse(currentUserJson);
@@ -116,8 +154,6 @@ export const resetPassword = (email: string, phone: string, newPass: string): { 
   }
 
   const user = users[userIndex];
-  
-  // Check if phone matches
   if (!user.phoneNumber || user.phoneNumber !== phone) {
     return { success: false, message: 'رقم الهاتف غير مطابق للسجلات' };
   }
@@ -135,7 +171,6 @@ export const updateUserProfile = (userId: string, name: string, email: string, p
   
     if (userIndex === -1) return { success: false, message: 'المستخدم غير موجود' };
   
-    // Check if email is taken by another user
     const emailExists = users.some(u => u.email === email && u.id !== userId);
     if (emailExists) return { success: false, message: 'البريد الإلكتروني مستخدم بالفعل' };
 
@@ -147,7 +182,6 @@ export const updateUserProfile = (userId: string, name: string, email: string, p
     users[userIndex] = user;
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
 
-    // Update current session
     const currentUserJson = localStorage.getItem('mediscan_user');
     if (currentUserJson) {
         const currentUser = JSON.parse(currentUserJson);

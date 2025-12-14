@@ -11,6 +11,11 @@ interface State {
 }
 
 class ErrorBoundary extends React.Component<Props, State> {
+  // Explicitly define constructor to fix TS error "Property 'props' does not exist"
+  constructor(props: Props) {
+    super(props);
+  }
+
   public state: State = {
     hasError: false,
     error: null,

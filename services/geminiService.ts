@@ -68,6 +68,9 @@ export const analyzeMedicalImage = async (base64Image: string, mimeType: string,
         responseMimeType: "application/json",
         temperature: options?.temperature ?? 0.5, // Default to 0.5 if not provided
         maxOutputTokens: options?.maxOutputTokens,
+        // Set thinkingBudget if maxOutputTokens is set to comply with guidelines for 2.5 models. 
+        // 0 disables thinking, ensuring tokens are available for the final response.
+        thinkingConfig: options?.maxOutputTokens ? { thinkingBudget: 0 } : undefined,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
