@@ -1,10 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, AnalysisOptions } from "../types";
 
-// Access API key directly from process.env as per guidelines.
-// Vite replaces this with the actual string during build.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 /**
  * Helper to convert File to Base64
  */
@@ -23,9 +19,13 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
 };
 
 export const analyzeMedicalImage = async (base64Image: string, mimeType: string, options?: AnalysisOptions): Promise<AnalysisResult> => {
+  // Check for API Key before initializing the client to avoid runtime crashes
   if (!process.env.API_KEY) {
     throw new Error("مفتاح API غير موجود. يرجى التأكد من إعدادات التطبيق.");
   }
+
+  // Initialize the client strictly when needed
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const modelId = "gemini-2.5-flash"; // Capable of multimodal analysis
 
@@ -104,6 +104,10 @@ export const analyzeMedicalImage = async (base64Image: string, mimeType: string,
 
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
+    // If the error comes from the SDK (like 400 or 403), usually it has a message
+    if (error instanceof Error) {
+        throw new Error(`فشل التحليل: ${error.message}`);
+    }
     throw new Error("فشل في تحليل الصورة. يرجى التأكد من اتصال الإنترنت والمحاولة مرة أخرى.");
   }
 };
