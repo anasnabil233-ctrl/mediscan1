@@ -52,7 +52,7 @@
       }
     </style>
     
-    <!-- Updated Import Map to Stable Versions matching package.json -->
+    <!-- Updated Import Map: Removed conflicting React 19 entries -->
     <script type="importmap">
 {
   "imports": {
@@ -84,6 +84,12 @@
       // Global Error Handler
       window.onerror = function(message, source, lineno, colno, error) {
         console.error("Global Error:", message, error);
+        // Optional: Display error on screen if root is still empty (loading stuck)
+        const root = document.getElementById('root');
+        if (root && root.innerText.includes('جاري تحميل التطبيق')) {
+           // Don't overwrite immediately, but if it persists, we might want to show it.
+           // For now, logging to console is sufficient for debugging.
+        }
       };
     </script>
   </head>
@@ -106,7 +112,7 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('sw.js')
             .then(registration => {
-              registration.update(); 
+              // registration.update(); 
               console.log('SW registered: ', registration);
             })
             .catch(registrationError => {
