@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "android:init": "npm install @capacitor/android @capacitor/core @capacitor/app @capacitor/toast",
+    "android:init": "npm install",
     "android:build": "npm run build && npx cap add android && npx cap sync && npx cap open android"
   },
   "dependencies": {
