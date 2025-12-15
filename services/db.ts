@@ -35,7 +35,7 @@ export const initDB = (): Promise<IDBDatabase> => {
 };
 
 /**
- * Add a record to the database
+ * Add or Update a record in the database (Upsert)
  */
 export const addRecordToDB = async (record: SavedRecord): Promise<void> => {
   try {
@@ -43,7 +43,8 @@ export const addRecordToDB = async (record: SavedRecord): Promise<void> => {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_RECORDS], 'readwrite');
       const store = transaction.objectStore(STORE_RECORDS);
-      const request = store.add(record);
+      // .put updates if key exists, adds if it doesn't
+      const request = store.put(record);
 
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);

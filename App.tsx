@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fileToGenerativePart, analyzeMedicalImage } from './services/geminiService';
-import { saveRecord, loadHistory, deleteRecord } from './services/storageService';
+import { saveRecord, loadHistory, deleteRecord, syncPendingRecords } from './services/storageService';
 import { AnalysisResult, AppState, SavedRecord, User, AnalysisOptions } from './types';
 import { getPatients } from './services/userService';
 import Header from './components/Header';
@@ -12,9 +12,10 @@ import LoginPage from './components/LoginPage';
 import UsersPage from './components/UsersPage';
 import ProfilePage from './components/ProfilePage';
 import SpecialtiesPage from './components/SpecialtiesPage';
+import DatabasePage from './components/DatabasePage';
 import HomePage from './components/HomePage';
 import ChatWidget from './components/ChatWidget';
-import { Loader2, RefreshCw, Activity, HeartPulse } from 'lucide-react';
+import { Activity, HeartPulse, WifiOff, RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
   // Auth State
@@ -22,7 +23,7 @@ const App: React.FC = () => {
   const [patientsList, setPatientsList] = useState<User[]>([]);
 
   // Navigation State
-  const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users' | 'profile' | 'specialties'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users' | 'profile' | 'specialties' | 'database'>('home');
 
   // App State (Dashboard)
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -39,15 +40,27 @@ const App: React.FC = () => {
   const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
+  // Network State
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
+    // Network Listeners
+    const handleOnline = () => {
+      setIsOnline(true);
+      handleSync();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     // PWA Install Prompt Listener
     const handleBeforeInstallPrompt = (e: any) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
     };
 
@@ -67,9 +80,26 @@ const App: React.FC = () => {
     }
 
     return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const count = await syncPendingRecords();
+      if (count > 0 && currentUser) {
+        console.log(`Synced ${count} records.`);
+        loadAndFilterHistory(currentUser); // Refresh to show synced status
+      }
+    } catch (e) {
+      console.error("Sync failed", e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleInstallClick = () => {
     if (deferredPrompt) {
@@ -88,10 +118,8 @@ const App: React.FC = () => {
     try {
       const allRecords = await loadHistory();
       if (user.role === 'Patient') {
-        // Patients only see their own records
         setHistoryRecords(allRecords.filter(r => r.userId === user.id));
       } else {
-        // Doctors/Admins see everything (or filter logic could be expanded)
         setHistoryRecords(allRecords);
       }
     } catch (e) {
@@ -110,7 +138,6 @@ const App: React.FC = () => {
       setPatientsList(getPatients());
       setCurrentView('home');
     } else {
-        // Patient
         setCurrentView('home'); 
     }
   };
@@ -131,15 +158,19 @@ const App: React.FC = () => {
   };
 
   const handleFileSelect = async (file: File, category: string, scanDate: string | undefined, options: AnalysisOptions) => {
-    // Validation Step: Check scan age
+    if (!isOnline) {
+      // Optional: block analysis if offline, or allow if Gemini logic was local (it's not).
+      // Since Gemini requires API, we must block analysis but allow viewing/saving existing.
+      alert("عذراً، يجب أن تكون متصلاً بالإنترنت لتحليل صور جديدة. يمكنك تصفح السجل أثناء وضع عدم الاتصال.");
+      return;
+    }
+
     if (scanDate) {
       const date = new Date(scanDate);
       const today = new Date();
-      // Calculate difference in months
       const diffTime = Math.abs(today.getTime() - date.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
       
-      // If older than 180 days (approx 6 months)
       if (diffDays > 180) {
         if (!window.confirm("تنبيه: تاريخ الأشعة المدخل قديم (أكثر من 6 أشهر). قد لا تعكس الأشعة الحالة الصحية الحالية بدقة. هل أنت متأكد من رغبتك في المتابعة؟")) {
           return;
@@ -153,25 +184,19 @@ const App: React.FC = () => {
       setResult(null);
       setCurrentRecordId(null);
       setCurrentCategory(category);
-      
-      // Ensure we are on dashboard when analyzing
       setCurrentView('dashboard');
 
-      // Create preview
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
 
-      // Convert to base64
       const base64Data = await fileToGenerativePart(file);
       setCurrentBase64(base64Data);
       
-      // Call API with options
       const analysisResult = await analyzeMedicalImage(base64Data, file.type, options);
       
       setResult(analysisResult);
       setAppState(AppState.SUCCESS);
       
-      // Refresh patients list just in case a new one was added
       if (currentUser?.role === 'Admin' || currentUser?.role === 'Doctor') {
         setPatientsList(getPatients());
       }
@@ -187,10 +212,8 @@ const App: React.FC = () => {
     if (result && currentBase64 && currentUser && !isSaving) {
       setIsSaving(true);
       
-      // Determine who owns the record
       const recordOwnerId = targetPatientId || currentUser.id;
       
-      // Find patient name for display purposes if assigned
       let patientName = currentUser.name;
       if (targetPatientId) {
         const targetPatient = patientsList.find(p => p.id === targetPatientId);
@@ -211,8 +234,8 @@ const App: React.FC = () => {
       setIsSaving(false);
       
       if (success) {
-        loadAndFilterHistory(currentUser); // Reload
-        setCurrentRecordId(newRecord.id); // Mark as saved
+        loadAndFilterHistory(currentUser); 
+        setCurrentRecordId(newRecord.id); 
         return true;
       } else {
         alert("لم نتمكن من الحفظ. حدث خطأ في قاعدة البيانات.");
@@ -230,15 +253,13 @@ const App: React.FC = () => {
     setAppState(AppState.SUCCESS);
     setHistoryOpen(false);
     
-    // Navigate to dashboard to see results
     if (currentUser?.role !== 'Patient') {
         setCurrentView('dashboard');
     }
   };
 
   const handleDeleteHistoryItem = async (id: string) => {
-    const updated = await deleteRecord(id);
-    // Reload with filter
+    await deleteRecord(id);
     if (currentUser) loadAndFilterHistory(currentUser);
     
     if (currentRecordId === id) {
@@ -256,13 +277,26 @@ const App: React.FC = () => {
     setCurrentCategory('');
   };
 
-  // Render Login Page if not logged in
   if (!currentUser) {
     return <LoginPage onLogin={handleLogin} />;
   }
 
   return (
     <div className="min-h-screen flex flex-col font-sans">
+      {/* Network Status Bar */}
+      {!isOnline && (
+        <div className="bg-slate-800 text-white text-xs py-1 text-center flex items-center justify-center gap-2">
+          <WifiOff size={14} />
+          <span>أنت الآن في وضع عدم الاتصال. يمكنك تصفح السجل، وسيتم مزامنة البيانات عند عودة الإنترنت.</span>
+        </div>
+      )}
+      {isOnline && isSyncing && (
+         <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2">
+          <RefreshCw size={14} className="animate-spin" />
+          <span>جاري مزامنة البيانات...</span>
+        </div>
+      )}
+
       <Header 
         currentView={currentView}
         onNavigate={setCurrentView}
@@ -278,7 +312,7 @@ const App: React.FC = () => {
         {/* VIEW: Home */}
         {currentView === 'home' && (
           <HomePage 
-            onStart={() => setCurrentView(currentUser.role === 'Patient' ? 'dashboard' : 'dashboard')} 
+            onStart={() => setCurrentView('dashboard')} 
             userRole={currentUser.role} 
           />
         )}
@@ -297,6 +331,13 @@ const App: React.FC = () => {
             </div>
         )}
 
+        {/* VIEW: Database Management (Admin Only) */}
+        {currentView === 'database' && currentUser.role === 'Admin' && (
+           <div className="p-4 md:p-8">
+              <DatabasePage />
+           </div>
+        )}
+
         {/* VIEW: Users (Admin AND Doctor) */}
         {currentView === 'users' && (currentUser.role === 'Admin' || currentUser.role === 'Doctor') && (
           <div className="p-4 md:p-8">
@@ -307,7 +348,7 @@ const App: React.FC = () => {
         {/* VIEW: Dashboard (Main) */}
         {currentView === 'dashboard' && (
             <div className="p-4 md:p-8">
-                {/* Patient Welcome Screen (When no file selected/viewed) */}
+                {/* Patient Welcome Screen */}
                 {currentUser.role === 'Patient' && appState === AppState.IDLE && (
                 <div className="max-w-2xl mx-auto text-center py-12 animate-fade-in-up">
                     <div className="bg-teal-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -315,7 +356,7 @@ const App: React.FC = () => {
                     </div>
                     <h2 className="text-3xl font-bold text-slate-800 mb-4">أهلاً بك، {currentUser.name}</h2>
                     <p className="text-slate-600 mb-8">
-                    يمكنك استعراض تاريخ فحوصاتك الطبية وتقارير الأشعة الخاصة بك من خلال الضغط على زر "فحوصاتي" أو الزر أدناه.
+                    يمكنك استعراض تاريخ فحوصاتك الطبية وتقارير الأشعة الخاصة بك.
                     </p>
                     <button 
                     onClick={() => setHistoryOpen(true)}
@@ -326,7 +367,7 @@ const App: React.FC = () => {
                 </div>
                 )}
 
-                {/* Dashboard / Main View (Shared but restricted for Patient) */}
+                {/* Dashboard / Main View */}
                 {(currentUser.role !== 'Patient' || appState === AppState.SUCCESS) && (
                     <div className="max-w-7xl mx-auto w-full">
                     
@@ -343,7 +384,7 @@ const App: React.FC = () => {
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         
-                        {/* Left Column: Input Area - HIDDEN for Patients unless viewing a result */}
+                        {/* Left Column: Input Area */}
                         {currentUser.role !== 'Patient' && (
                         <div className={`lg:col-span-5 space-y-6 ${appState === AppState.SUCCESS ? 'lg:sticky lg:top-24' : 'mx-auto w-full max-w-2xl lg:col-span-12'}`}>
                         
@@ -366,10 +407,9 @@ const App: React.FC = () => {
                                 )}
                             </div>
                             ) : (
-                            <FileUpload onFileSelect={handleFileSelect} disabled={appState === AppState.ANALYZING} />
+                            <FileUpload onFileSelect={handleFileSelect} disabled={appState === AppState.ANALYZING || !isOnline} />
                             )}
 
-                            {/* Status States */}
                             {appState === AppState.ANALYZING && (
                             <div className="mt-6 text-center py-8">
                                 <div className="relative inline-flex mb-4">
@@ -398,11 +438,10 @@ const App: React.FC = () => {
                         </div>
                         )}
 
-                        {/* Right Column: Results - Visible for all when Success */}
+                        {/* Right Column: Results */}
                         {appState === AppState.SUCCESS && result && (
                         <div className={`${currentUser.role === 'Patient' ? 'lg:col-span-12 max-w-4xl mx-auto' : 'lg:col-span-7'} w-full`}>
                             
-                            {/* For Patients: Show Image on top of results because upload col is hidden */}
                             {currentUser.role === 'Patient' && previewUrl && (
                                 <div className="mb-6 bg-black rounded-xl overflow-hidden h-64 md:h-96 flex items-center justify-center border border-slate-200 shadow-sm">
                                     <img src={previewUrl} alt="Scan" className="max-h-full max-w-full object-contain" />
@@ -413,7 +452,7 @@ const App: React.FC = () => {
                             result={result} 
                             onSave={(target) => {
                                 handleSaveResult(target);
-                                return true; // Optimistic update, but button state is handled by isSaving logic in App
+                                return true;
                             }} 
                             isSaved={!!currentRecordId}
                             userRole={currentUser.role}
@@ -428,7 +467,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Pass isLoadingHistory to show loading state if needed */}
       <HistoryModal 
         isOpen={historyOpen}
         onClose={() => setHistoryOpen(false)}
@@ -438,7 +476,6 @@ const App: React.FC = () => {
         currentUser={currentUser}
       />
 
-      {/* Chat Widget */}
       {currentUser && <ChatWidget currentUser={currentUser} />}
 
       <Footer />

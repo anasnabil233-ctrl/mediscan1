@@ -1,10 +1,10 @@
 import React from 'react';
-import { Activity, History, LogOut, Users, LayoutDashboard, HeartPulse, UserCog, Stethoscope, Home, Download } from 'lucide-react';
+import { Activity, History, LogOut, Users, LayoutDashboard, HeartPulse, UserCog, Stethoscope, Home, Download, Database } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface HeaderProps {
-  currentView: 'home' | 'dashboard' | 'users' | 'profile' | 'specialties';
-  onNavigate: (view: 'home' | 'dashboard' | 'users' | 'profile' | 'specialties') => void;
+  currentView: 'home' | 'dashboard' | 'users' | 'profile' | 'specialties' | 'database';
+  onNavigate: (view: 'home' | 'dashboard' | 'users' | 'profile' | 'specialties' | 'database') => void;
   onOpenHistory?: () => void;
   onLogout?: () => void;
   userRole?: UserRole;
@@ -59,7 +59,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenHistory,
                 <span className="hidden lg:inline font-medium">الرئيسية</span>
               </button>
 
-            {/* Dashboard Link - Hidden for Patient unless they want to upload specifically (Patients default flow is mostly history) */}
+            {/* Dashboard Link - Hidden for Patient unless they want to upload specifically */}
             {userRole !== 'Patient' && (
               <button 
                 onClick={() => onNavigate('dashboard')}
@@ -83,7 +83,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenHistory,
               </button>
             )}
 
-             {/* Specialties Link - For Admin (Manage) & Others (View) */}
+             {/* Specialties Link */}
              <button 
                 onClick={() => onNavigate('specialties')}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${currentView === 'specialties' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:text-teal-600 hover:bg-slate-50'}`}
@@ -92,6 +92,18 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenHistory,
                 <Stethoscope size={20} />
                 <span className="hidden lg:inline font-medium">التخصصات</span>
               </button>
+
+            {/* Database Management - ADMIN ONLY */}
+            {userRole === 'Admin' && (
+              <button 
+                onClick={() => onNavigate('database')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${currentView === 'database' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:text-teal-600 hover:bg-slate-50'}`}
+                title="قاعدة البيانات"
+              >
+                <Database size={20} />
+                <span className="hidden lg:inline font-medium">البيانات</span>
+              </button>
+            )}
 
              {/* History/My Scans Link */}
              <button 

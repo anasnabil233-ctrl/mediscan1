@@ -32,6 +32,7 @@ export interface SavedRecord {
   result: AnalysisResult;
   imageData: string; // Base64
   category?: string; // Type of scan (e.g., X-Ray, MRI)
+  synced?: boolean; // True if saved to cloud, false if local only
 }
 
 export type UserRole = 'Admin' | 'Doctor' | 'Patient';
