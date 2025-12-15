@@ -3,7 +3,7 @@ import { fileToGenerativePart, analyzeMedicalImage } from './services/geminiServ
 import { saveRecord, loadHistory, deleteRecord, syncPendingRecords, syncAllData } from './services/storageService';
 import { checkConnection } from './services/supabaseClient';
 import { AnalysisResult, AppState, SavedRecord, User, AnalysisOptions } from './types';
-import { getPatients } from './services/userService';
+import { getPatients, refreshLocalUsersFromDB } from './services/userService';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import BottomNav from './components/BottomNav';
@@ -68,6 +68,7 @@ const App: React.FC = () => {
     // Network Listeners
     const handleOnline = () => {
       setIsOnline(true);
+      // Auto-sync when coming back online
       handleSync();
     };
     const handleOffline = () => setIsOnline(false);
@@ -83,8 +84,22 @@ const App: React.FC = () => {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Initial Database Connection & Sync
+    // Initial Database Connection & Sync (Auto-Connect Logic)
     const initializeApp = async () => {
+       // Load user from local storage first to show UI immediately
+       const storedUser = localStorage.getItem('mediscan_user');
+       let userObj = null;
+       
+       if (storedUser) {
+          userObj = JSON.parse(storedUser);
+          setCurrentUser(userObj);
+          // Initial local load (fast)
+          loadAndFilterHistory(userObj);
+          if (userObj.role === 'Admin' || userObj.role === 'Doctor' || userObj.role === 'Supervisor') {
+            setPatientsList(getPatients());
+          }
+       }
+
        if (navigator.onLine) {
            console.log("App opened: Initiating Database Connection & Sync...");
            setIsSyncing(true);
@@ -93,44 +108,32 @@ const App: React.FC = () => {
              // 1. Verify Connection
              const isConnected = await checkConnection();
              setDbConnected(isConnected);
-             if (isConnected) {
-                 console.log("Database connected successfully.");
-             } else {
-                 console.warn("Database connection check returned false.");
+             
+             // 2. Perform Full Sync (Pull latest data from Cloud)
+             const syncResult = await syncAllData();
+             console.log("Initial Cloud Sync Complete:", syncResult);
+             
+             // 3. IMPORTANT: Refresh Memory/LocalStorage from IndexedDB
+             // This ensures we see new users/records that came from Supabase immediately
+             await refreshLocalUsersFromDB();
+             
+             // 4. Refresh UI Lists with new data
+             if (userObj) {
+                await loadAndFilterHistory(userObj);
+                if (userObj.role === 'Admin' || userObj.role === 'Doctor' || userObj.role === 'Supervisor') {
+                    setPatientsList(getPatients());
+                }
              }
 
-             // 2. Perform Full Sync (Two-Way)
-             const syncResult = await syncAllData();
-             console.log("Initial Sync Complete:", syncResult);
            } catch(e) {
              console.error("Initial sync failed:", e);
            } finally {
              setIsSyncing(false);
            }
-           
-           // Refresh data if user is logged in
-           const storedUser = localStorage.getItem('mediscan_user');
-           if (storedUser) {
-               const user = JSON.parse(storedUser);
-               loadAndFilterHistory(user);
-           }
        }
     };
 
     initializeApp();
-
-    // Check auth
-    const storedUser = localStorage.getItem('mediscan_user');
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      setCurrentUser(user);
-      loadAndFilterHistory(user);
-      
-      // Load patients list if admin or doctor
-      if (user.role === 'Admin' || user.role === 'Doctor' || user.role === 'Supervisor') {
-        setPatientsList(getPatients());
-      }
-    }
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -138,14 +141,20 @@ const App: React.FC = () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       CapacitorApp.removeAllListeners();
     };
-  }, [historyOpen, currentView]); // Dependency array includes historyOpen/currentView for back button logic
+  }, []); // Empty dependency array = runs once on mount
 
+  // Manual Trigger or Re-sync
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      await syncAllData(); // Use the robust sync
+      await syncAllData(); 
+      await refreshLocalUsersFromDB(); // Ensure users are updated
+      
       if (currentUser) {
-        loadAndFilterHistory(currentUser); // Refresh to show synced status
+        await loadAndFilterHistory(currentUser); 
+        if (currentUser.role === 'Admin' || currentUser.role === 'Doctor') {
+             setPatientsList(getPatients());
+        }
       }
     } catch (e) {
       console.error("Sync failed", e);
@@ -186,7 +195,9 @@ const App: React.FC = () => {
     localStorage.setItem('mediscan_user', JSON.stringify(user));
     setCurrentUser(user);
     loadAndFilterHistory(user);
-    handleSync(); // Sync on login
+    
+    // Trigger sync on login to ensure fresh data
+    handleSync(); 
     
     if (user.role === 'Admin' || user.role === 'Doctor' || user.role === 'Supervisor') {
       setPatientsList(getPatients());
@@ -341,9 +352,9 @@ const App: React.FC = () => {
     return (
         <>
             {isSyncing && (
-                <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2 fixed top-0 left-0 right-0 z-[100] pt-[env(safe-area-inset-top)]">
+                <div className="bg-teal-600 text-white text-xs py-2 text-center flex items-center justify-center gap-2 fixed top-0 left-0 right-0 z-[100] pt-[env(safe-area-inset-top)] shadow-md">
                     <RefreshCw size={14} className="animate-spin" />
-                    <span>جاري الاتصال بقاعدة البيانات...</span>
+                    <span>جاري الاتصال بقاعدة البيانات السحابية وجلب البيانات...</span>
                 </div>
             )}
             <LoginPage onLogin={handleLogin} />
@@ -363,7 +374,7 @@ const App: React.FC = () => {
       {isOnline && isSyncing && (
          <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2 sticky top-0 z-[60]">
           <RefreshCw size={14} className="animate-spin" />
-          <span>جاري المزامنة...</span>
+          <span>جاري المزامنة مع السحابة...</span>
         </div>
       )}
 

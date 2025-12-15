@@ -40,6 +40,23 @@ const initializeUsers = async () => {
 // Trigger initialization
 initializeUsers();
 
+/**
+ * Refreshes the localStorage cache from IndexedDB.
+ * Call this after a cloud sync to make sure the UI sees the new users.
+ */
+export const refreshLocalUsersFromDB = async (): Promise<User[]> => {
+    try {
+        const dbUsers = await getAllUsersFromDB();
+        if (dbUsers.length > 0) {
+            localStorage.setItem(USERS_KEY, JSON.stringify(dbUsers));
+            return dbUsers;
+        }
+    } catch (e) {
+        console.error("Error refreshing users from DB:", e);
+    }
+    return getUsers();
+};
+
 export const getUsers = (): User[] => {
   const stored = localStorage.getItem(USERS_KEY);
   if (!stored) {
