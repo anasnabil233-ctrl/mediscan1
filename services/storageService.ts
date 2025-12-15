@@ -1,5 +1,5 @@
-import { SavedRecord } from '../types';
-import { addRecordToDB, getAllRecordsFromDB, deleteRecordFromDB } from './db';
+import { SavedRecord, User, UserRole } from '../types';
+import { addRecordToDB, getAllRecordsFromDB, deleteRecordFromDB, getAllUsersFromDB, saveUserToDB } from './db';
 import { supabase } from './supabaseClient';
 
 /**
@@ -72,32 +72,94 @@ export const loadHistory = async (): Promise<SavedRecord[]> => {
 };
 
 /**
- * Fetches data from Supabase and updates local IndexedDB
+ * Fetches RECORDS from Supabase and updates local IndexedDB
  */
 export const syncRemoteToLocal = async () => {
   if (!supabase) return;
 
-  const { data, error } = await supabase
+  // 1. Sync Records
+  const { data: recordsData, error: recordsError } = await supabase
     .from('records')
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (error || !data) return;
-
-  // Upsert all remote records into local DB
-  for (const item of data) {
-    const record: SavedRecord = {
-      id: item.id,
-      userId: item.user_id,
-      patientName: item.patient_name,
-      timestamp: new Date(item.created_at).getTime(),
-      result: item.result,
-      imageData: item.image_data,
-      category: item.category,
-      synced: true // Coming from server, so it is synced
-    };
-    await addRecordToDB(record);
+  if (!recordsError && recordsData) {
+    for (const item of recordsData) {
+      const record: SavedRecord = {
+        id: item.id,
+        userId: item.user_id,
+        patientName: item.patient_name,
+        timestamp: new Date(item.created_at).getTime(),
+        result: item.result,
+        imageData: item.image_data,
+        category: item.category,
+        synced: true
+      };
+      await addRecordToDB(record);
+    }
   }
+
+  // 2. Sync Users (Profiles)
+  await syncRemoteUsersToLocal();
+};
+
+/**
+ * Fetches USERS from Supabase 'profiles' table and updates local IndexedDB
+ */
+export const syncRemoteUsersToLocal = async () => {
+    if (!supabase) return;
+
+    const { data: usersData, error: usersError } = await supabase
+        .from('profiles')
+        .select('*');
+
+    if (!usersError && usersData) {
+        for (const item of usersData) {
+            // Map Supabase profile to Local User
+            const user: User = {
+                id: item.id,
+                name: item.name || 'Unknown',
+                email: item.email || '',
+                role: item.role as UserRole,
+                status: 'Active',
+                phoneNumber: item.phone_number,
+                assignedDoctorId: item.assigned_doctor_id,
+                password: item.password, // Sync password for custom auth compatibility
+                permissions: item.permissions, // Sync permissions array
+                lastLogin: Date.now() 
+            };
+            await saveUserToDB(user);
+        }
+        console.log(`Synced ${usersData.length} users from remote.`);
+    }
+};
+
+/**
+ * Pushes Local Users to Supabase 'profiles'
+ */
+export const syncLocalUsersToRemote = async () => {
+    if (!supabase || !navigator.onLine) return;
+
+    try {
+        const localUsers = await getAllUsersFromDB();
+        for (const user of localUsers) {
+            // Upsert user profile
+            const { error } = await supabase.from('profiles').upsert({
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                phone_number: user.phoneNumber,
+                assigned_doctor_id: user.assignedDoctorId,
+                password: user.password, // Sync password
+                permissions: user.permissions
+            });
+            
+            if (error) console.error(`Error syncing user ${user.name}:`, error);
+        }
+    } catch (e) {
+        console.error("Error in syncLocalUsersToRemote:", e);
+    }
 };
 
 /**
@@ -109,8 +171,6 @@ export const syncPendingRecords = async (): Promise<number> => {
 
   const allRecords = await getAllRecordsFromDB();
   const pendingRecords = allRecords.filter(r => !r.synced);
-
-  if (pendingRecords.length === 0) return 0;
 
   let syncedCount = 0;
 
@@ -153,14 +213,17 @@ export const syncPendingRecords = async (): Promise<number> => {
 export const syncAllData = async (): Promise<{ pulled: boolean; pushedCount: number }> => {
     if (!supabase || !navigator.onLine) return { pulled: false, pushedCount: 0 };
     
-    console.log("Creating connection to database and syncing...");
+    console.log("Creating connection to database and syncing ALL data...");
     
-    // 1. Push Local -> Remote
+    // 1. Push Local Records -> Remote
     const pushedCount = await syncPendingRecords();
     
-    // 2. Pull Remote -> Local
+    // 2. Push Local Users -> Remote
+    await syncLocalUsersToRemote();
+
+    // 3. Pull Remote Records & Users -> Local
     try {
-        await syncRemoteToLocal();
+        await syncRemoteToLocal(); // This now calls syncRemoteUsersToLocal internally too
         return { pulled: true, pushedCount };
     } catch (e) {
         console.error("Sync pull failed", e);

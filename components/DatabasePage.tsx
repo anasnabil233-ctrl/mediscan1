@@ -3,7 +3,7 @@ import { Database, Server, HardDrive, Users, RefreshCw, Cloud, Wifi, WifiOff, Al
 import { supabase } from '../services/supabaseClient';
 import { getAllRecordsFromDB, addRecordToDB, getAllUsersFromDB, saveUserToDB } from '../services/db';
 import { getUsers, saveUser } from '../services/userService';
-import { syncPendingRecords, syncRemoteToLocal } from '../services/storageService';
+import { syncAllData, syncPendingRecords, syncRemoteToLocal } from '../services/storageService';
 import { SavedRecord, User } from '../types';
 
 const DatabasePage: React.FC = () => {
@@ -89,11 +89,13 @@ const DatabasePage: React.FC = () => {
     
     setIsSyncing(true);
     try {
-      await syncPendingRecords();
-      await syncRemoteToLocal(); // Also pull new data
+      // Use the full sync function which now includes users
+      await syncAllData();
       await fetchStats(); // Refresh stats after sync
+      alert('تمت مزامنة جميع البيانات (السجلات والمستخدمين) بنجاح.');
     } catch (e) {
       console.error("Manual sync failed:", e);
+      alert('حدث خطأ أثناء المزامنة. يرجى مراجعة الاتصال.');
     } finally {
       setIsSyncing(false);
     }
@@ -354,9 +356,9 @@ const DatabasePage: React.FC = () => {
                   className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                    <RefreshCw size={20} className={isSyncing ? "animate-spin" : ""} />
-                   {isSyncing ? 'جاري المزامنة...' : 'مزامنة السجلات الآن'}
+                   {isSyncing ? 'جاري مزامنة كل البيانات...' : 'مزامنة شاملة (سجلات + مستخدمين)'}
                 </button>
-                <p className="text-xs text-slate-400 mt-2 text-center">المزامنة تشمل السجلات الطبية فقط حالياً.</p>
+                <p className="text-xs text-slate-400 mt-2 text-center">تشمل المزامنة السجلات الطبية وحسابات المستخدمين.</p>
             </div>
          </div>
 
