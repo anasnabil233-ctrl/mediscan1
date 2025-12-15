@@ -159,3 +159,23 @@ export const getAllUsersFromDB = async (): Promise<User[]> => {
     return [];
   }
 };
+
+/**
+ * Delete a USER from the database
+ */
+export const deleteUserFromDB = async (id: string): Promise<void> => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_USERS], 'readwrite');
+      const store = transaction.objectStore(STORE_USERS);
+      const request = store.delete(id);
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error("Error deleting user from DB:", e);
+    throw e;
+  }
+};

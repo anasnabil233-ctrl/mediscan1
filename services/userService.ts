@@ -1,6 +1,6 @@
 import { User, UserRole } from '../types';
 import { supabase } from './supabaseClient';
-import { saveUserToDB, getAllUsersFromDB } from './db';
+import { saveUserToDB, getAllUsersFromDB, deleteUserFromDB } from './db';
 
 const USERS_KEY = 'mediscan_users';
 
@@ -137,7 +137,7 @@ export const loginUser = async (email: string, password?: string): Promise<User 
 
 // --- User Management ---
 
-export const saveUser = (user: User): User[] => {
+export const saveUser = async (user: User): Promise<User[]> => {
   const users = getUsers();
   const index = users.findIndex(u => u.id === user.id);
   
@@ -155,20 +155,54 @@ export const saveUser = (user: User): User[] => {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
   
   // 2. Save to IndexedDB (Persistence for Backup)
-  saveUserToDB(user);
+  await saveUserToDB(user);
+
+  // 3. Save to Supabase (Cloud Sync) - Fire and await if possible
+  if (supabase && navigator.onLine) {
+    try {
+        const { error } = await supabase.from('profiles').upsert({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            phone_number: user.phoneNumber,
+            assigned_doctor_id: user.assignedDoctorId,
+            password: user.password,
+            permissions: user.permissions,
+            status: user.status
+        });
+        if (error) console.error("Supabase upsert user error:", error);
+    } catch (e) {
+        console.error("Supabase connection error:", e);
+    }
+  }
 
   return users;
 };
 
-export const deleteUser = (id: string): User[] => {
+export const deleteUser = async (id: string): Promise<User[]> => {
+  // 1. Remove from Local Storage
   const users = getUsers().filter(u => u.id !== id);
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  // Note: We are not deleting from IndexedDB in this snippet to keep it simple, 
-  // but a real implementation should handle soft deletes.
+
+  // 2. Remove from IndexedDB
+  await deleteUserFromDB(id);
+
+  // 3. Remove from Supabase
+  if (supabase && navigator.onLine) {
+    try {
+        const { error } = await supabase.from('profiles').delete().eq('id', id);
+        if (error) console.error("Supabase delete user error:", error);
+        else console.log("User deleted from Supabase");
+    } catch (e) {
+        console.error("Supabase connection error during delete:", e);
+    }
+  }
+
   return users;
 };
 
-export const updatePassword = (userId: string, oldPass: string, newPass: string): { success: boolean; message: string } => {
+export const updatePassword = async (userId: string, oldPass: string, newPass: string): Promise<{ success: boolean; message: string }> => {
   const users = getUsers();
   const userIndex = users.findIndex(u => u.id === userId);
 
@@ -182,9 +216,11 @@ export const updatePassword = (userId: string, oldPass: string, newPass: string)
   user.password = newPass;
   users[userIndex] = user;
   
+  // Update storages
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  saveUserToDB(user); // Persist to DB
+  await saveUserToDB(user); 
   
+  // Update active session user if same
   const currentUserJson = localStorage.getItem('mediscan_user');
   if (currentUserJson) {
       const currentUser = JSON.parse(currentUserJson);
@@ -194,10 +230,17 @@ export const updatePassword = (userId: string, oldPass: string, newPass: string)
       }
   }
 
+  // Sync to Cloud
+  if (supabase && navigator.onLine) {
+      try {
+        await supabase.from('profiles').update({ password: newPass }).eq('id', userId);
+      } catch (e) { console.error("Sync password error", e); }
+  }
+
   return { success: true, message: 'تم تحديث كلمة المرور بنجاح' };
 };
 
-export const resetPassword = (email: string, phone: string, newPass: string): { success: boolean; message: string } => {
+export const resetPassword = async (email: string, phone: string, newPass: string): Promise<{ success: boolean; message: string }> => {
   const users = getUsers();
   const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
 
@@ -214,12 +257,19 @@ export const resetPassword = (email: string, phone: string, newPass: string): { 
   users[userIndex] = user;
   
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  saveUserToDB(user); // Persist to DB
+  await saveUserToDB(user);
+
+  // Sync to Cloud
+  if (supabase && navigator.onLine) {
+      try {
+        await supabase.from('profiles').update({ password: newPass }).eq('id', user.id);
+      } catch (e) { console.error("Sync reset password error", e); }
+  }
 
   return { success: true, message: 'تم إعادة تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.' };
 };
 
-export const updateUserProfile = (userId: string, name: string, email: string, phoneNumber?: string): { success: boolean; message: string; user?: User } => {
+export const updateUserProfile = async (userId: string, name: string, email: string, phoneNumber?: string): Promise<{ success: boolean; message: string; user?: User }> => {
     const users = getUsers();
     const userIndex = users.findIndex(u => u.id === userId);
   
@@ -236,7 +286,7 @@ export const updateUserProfile = (userId: string, name: string, email: string, p
     users[userIndex] = user;
     
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    saveUserToDB(user); // Persist to DB
+    await saveUserToDB(user);
 
     const currentUserJson = localStorage.getItem('mediscan_user');
     if (currentUserJson) {
@@ -247,6 +297,17 @@ export const updateUserProfile = (userId: string, name: string, email: string, p
             currentUser.phoneNumber = phoneNumber;
             localStorage.setItem('mediscan_user', JSON.stringify(currentUser));
         }
+    }
+
+    // Sync to Cloud
+    if (supabase && navigator.onLine) {
+        try {
+            await supabase.from('profiles').update({ 
+                name, 
+                email, 
+                phone_number: phoneNumber 
+            }).eq('id', userId);
+        } catch (e) { console.error("Sync profile error", e); }
     }
 
     return { success: true, message: 'تم تحديث البيانات بنجاح', user };

@@ -81,8 +81,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           return;
       }
 
-      setTimeout(() => {
-          const result = resetPassword(email, resetPhone, newPassword);
+      setTimeout(async () => {
+          const result = await resetPassword(email, resetPhone, newPassword);
           setIsLoading(false);
           if (result.success) {
               setSuccessMsg(result.message);

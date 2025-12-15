@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, AppPermission } from '../types';
 import { getUsers, saveUser, deleteUser, getDoctors, getPatientsForDoctor } from '../services/userService';
-import { Users, UserPlus, Search, Shield, CheckCircle2, XCircle, Trash2, Edit2, Save, X, HeartPulse, Stethoscope, Phone, Briefcase, Lock } from 'lucide-react';
+import { Users, UserPlus, Search, Shield, CheckCircle2, XCircle, Trash2, Edit2, Save, X, HeartPulse, Stethoscope, Phone, Briefcase, Lock, Loader2 } from 'lucide-react';
 
 interface UsersPageProps {
   currentUser: User;
@@ -21,6 +21,7 @@ const UsersPage: React.FC<UsersPageProps> = ({ currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [availableDoctors, setAvailableDoctors] = useState<User[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const isDoctor = currentUser.role === 'Doctor';
 
@@ -73,44 +74,62 @@ const UsersPage: React.FC<UsersPageProps> = ({ currentUser }) => {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email) return;
 
-    const finalRole = isDoctor ? 'Patient' : (formData.role as UserRole);
-    const finalDoctorId = isDoctor ? currentUser.id : formData.assignedDoctorId;
-    const finalPermissions = finalRole === 'Supervisor' ? (formData.permissions || []) : undefined;
+    setIsProcessing(true);
+    try {
+        const finalRole = isDoctor ? 'Patient' : (formData.role as UserRole);
+        const finalDoctorId = isDoctor ? currentUser.id : formData.assignedDoctorId;
+        const finalPermissions = finalRole === 'Supervisor' ? (formData.permissions || []) : undefined;
 
-    const newUser: User = {
-      id: editingUser ? editingUser.id : crypto.randomUUID(),
-      name: formData.name,
-      email: formData.email,
-      phoneNumber: formData.phoneNumber,
-      role: finalRole,
-      status: formData.status as 'Active' | 'Inactive',
-      lastLogin: editingUser?.lastLogin,
-      assignedDoctorId: finalRole === 'Patient' ? finalDoctorId : undefined,
-      permissions: finalPermissions
-    };
+        const newUser: User = {
+          id: editingUser ? editingUser.id : crypto.randomUUID(),
+          name: formData.name,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
+          role: finalRole,
+          status: formData.status as 'Active' | 'Inactive',
+          lastLogin: editingUser?.lastLogin,
+          assignedDoctorId: finalRole === 'Patient' ? finalDoctorId : undefined,
+          permissions: finalPermissions
+        };
 
-    const updatedList = saveUser(newUser);
-    
-    if (isDoctor) {
-        setUsers(getPatientsForDoctor(currentUser.id));
-    } else {
-        setUsers(updatedList);
+        // Await the async save
+        const updatedList = await saveUser(newUser);
+        
+        if (isDoctor) {
+            setUsers(getPatientsForDoctor(currentUser.id));
+        } else {
+            setUsers(updatedList);
+        }
+        
+        setIsModalOpen(false);
+    } catch (error) {
+        console.error("Error saving user:", error);
+        alert("حدث خطأ أثناء حفظ المستخدم.");
+    } finally {
+        setIsProcessing(false);
     }
-    
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
-      const updatedList = deleteUser(id);
-      if (isDoctor) {
-        setUsers(getPatientsForDoctor(currentUser.id));
-      } else {
-        setUsers(updatedList);
+  const handleDelete = async (id: string) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا المستخدم؟ سيتم حذفه من قاعدة البيانات أيضاً.')) {
+      setIsProcessing(true);
+      try {
+          // Await the async delete
+          const updatedList = await deleteUser(id);
+          if (isDoctor) {
+            setUsers(getPatientsForDoctor(currentUser.id));
+          } else {
+            setUsers(updatedList);
+          }
+      } catch (error) {
+          console.error("Error deleting user:", error);
+          alert("فشل حذف المستخدم.");
+      } finally {
+          setIsProcessing(false);
       }
     }
   };
@@ -161,7 +180,16 @@ const UsersPage: React.FC<UsersPageProps> = ({ currentUser }) => {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+        {isProcessing && (
+            <div className="absolute inset-0 bg-white/50 z-50 flex items-center justify-center">
+                <div className="bg-white p-4 rounded-xl shadow-lg border border-slate-200 flex flex-col items-center">
+                    <Loader2 className="animate-spin text-teal-600 mb-2" size={32} />
+                    <span className="text-sm font-bold text-slate-600">جاري المعالجة...</span>
+                </div>
+            </div>
+        )}
+
         {/* Toolbar */}
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
           <div className="relative flex-grow max-w-md">
@@ -451,15 +479,17 @@ const UsersPage: React.FC<UsersPageProps> = ({ currentUser }) => {
                 <button 
                   type="button"
                   onClick={() => setIsModalOpen(false)}
+                  disabled={isProcessing}
                   className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-sm transition-colors"
                 >
                   إلغاء
                 </button>
                 <button 
                   type="submit"
-                  className="px-4 py-2 bg-teal-600 text-white hover:bg-teal-700 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shadow-sm"
+                  disabled={isProcessing}
+                  className="px-4 py-2 bg-teal-600 text-white hover:bg-teal-700 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50"
                 >
-                  <Save size={16} />
+                  {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                   حفظ
                 </button>
               </div>

@@ -30,11 +30,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser }) 
     setPhoneNumber(currentUser.phoneNumber || '');
   }, [currentUser]);
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileMsg(null);
 
-    const result = updateUserProfile(currentUser.id, name, email, phoneNumber);
+    const result = await updateUserProfile(currentUser.id, name, email, phoneNumber);
     if (result.success && result.user) {
       setProfileMsg({ type: 'success', text: result.message });
       onUpdateUser(result.user);
@@ -43,7 +43,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser }) 
     }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPassMsg(null);
 
@@ -57,7 +57,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser }) 
       return;
     }
 
-    const result = updatePassword(currentUser.id, oldPassword, newPassword);
+    const result = await updatePassword(currentUser.id, oldPassword, newPassword);
     
     if (result.success) {
       setPassMsg({ type: 'success', text: result.message });
