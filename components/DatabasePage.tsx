@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Database, Server, HardDrive, Users, RefreshCw, Cloud, Wifi, WifiOff, AlertTriangle, CheckCircle2, Download, Upload, FileJson } from 'lucide-react';
+import { Database, Server, HardDrive, Users, RefreshCw, Cloud, Wifi, WifiOff, AlertTriangle, CheckCircle2, Download, Upload, FileJson, FileCode } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { getAllRecordsFromDB, addRecordToDB, getAllUsersFromDB, saveUserToDB } from '../services/db';
 import { getUsers, saveUser } from '../services/userService';
@@ -99,6 +99,87 @@ const DatabasePage: React.FC = () => {
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const handleDownloadSchema = () => {
+    const schemaContent = `-- RUN THIS IN SUPABASE SQL EDITOR TO FIX TABLE ERRORS
+
+-- 1. Create PROFILES table if not exists
+create table if not exists public.profiles (
+  id uuid not null primary key,
+  email text,
+  name text,
+  phone_number text,
+  role text,
+  status text default 'Active',
+  password text,
+  assigned_doctor_id uuid,
+  permissions text[],
+  last_login bigint,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 2. Create RECORDS table if not exists
+create table if not exists public.records (
+  id uuid not null primary key,
+  user_id uuid,
+  patient_name text,
+  result jsonb,
+  image_data text,
+  category text,
+  synced boolean default true,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 3. Enable Security (RLS)
+alter table public.profiles enable row level security;
+alter table public.records enable row level security;
+
+-- 4. Create open policies (Restrict in production)
+drop policy if exists "Enable access to all users" on public.profiles;
+create policy "Enable access to all users" on public.profiles for all using (true) with check (true);
+
+drop policy if exists "Enable access to all users" on public.records;
+create policy "Enable access to all users" on public.records for all using (true) with check (true);
+
+-- 5. Add columns if table already exists (Migration Safe)
+do $$
+begin
+    -- Add password if missing
+    if not exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'password') then
+        alter table public.profiles add column password text;
+    end if;
+    
+    -- Add permissions if missing
+    if not exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'permissions') then
+        alter table public.profiles add column permissions text[];
+    end if;
+    
+    -- Add assigned_doctor_id if missing
+    if not exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'assigned_doctor_id') then
+        alter table public.profiles add column assigned_doctor_id uuid;
+    end if;
+
+    -- Add phone_number if missing
+    if not exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'phone_number') then
+        alter table public.profiles add column phone_number text;
+    end if;
+
+    -- Add last_login if missing
+    if not exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'last_login') then
+        alter table public.profiles add column last_login bigint;
+    end if;
+end $$;
+`;
+    const blob = new Blob([schemaContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'mediscan_supabase_schema.sql';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // --- Backup & Restore Logic ---
@@ -350,15 +431,27 @@ const DatabasePage: React.FC = () => {
                    </div>
                 </div>
 
-                <button
-                  onClick={handleForceSync}
-                  disabled={isSyncing || !isOnline}
-                  className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                   <RefreshCw size={20} className={isSyncing ? "animate-spin" : ""} />
-                   {isSyncing ? 'جاري مزامنة كل البيانات...' : 'مزامنة شاملة (سجلات + مستخدمين)'}
-                </button>
-                <p className="text-xs text-slate-400 mt-2 text-center">تشمل المزامنة السجلات الطبية وحسابات المستخدمين.</p>
+                <div className="flex flex-col gap-3">
+                    <button
+                    onClick={handleForceSync}
+                    disabled={isSyncing || !isOnline}
+                    className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                    <RefreshCw size={20} className={isSyncing ? "animate-spin" : ""} />
+                    {isSyncing ? 'جاري مزامنة كل البيانات...' : 'مزامنة شاملة (سجلات + مستخدمين)'}
+                    </button>
+
+                    <button
+                        onClick={handleDownloadSchema}
+                        className="w-full bg-slate-100 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors shadow-sm flex items-center justify-center gap-2"
+                    >
+                        <FileCode size={20} />
+                        تحميل ملف إصلاح قاعدة البيانات (SQL)
+                    </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-2 text-center">
+                    إذا واجهت أخطاء "Missing Column"، قم بتحميل ملف SQL وتشغيله في Supabase.
+                </p>
             </div>
          </div>
 

@@ -4,11 +4,11 @@ import { saveUserToDB, getAllUsersFromDB } from './db';
 
 const USERS_KEY = 'mediscan_users';
 
-// Fallback Mock Data
+// Fallback Mock Data with Valid UUIDs for Supabase compatibility
 const MOCK_USERS: User[] = [
-  { id: '1', name: 'د. أحمد محمد', email: 'admin@mediscan.ai', phoneNumber: '01000000000', password: '123', role: 'Admin', status: 'Active', lastLogin: Date.now() - 3600000 },
-  { id: '2', name: 'د. سارة علي', email: 'sara@mediscan.ai', phoneNumber: '01100000000', password: '123', role: 'Doctor', status: 'Active', lastLogin: Date.now() - 86400000 },
-  { id: '3', name: 'أ. سامي السيد', email: 'patient@mediscan.ai', phoneNumber: '01200000000', password: '123', role: 'Patient', status: 'Active', lastLogin: Date.now() - 400000, assignedDoctorId: '2' },
+  { id: 'a1b2c3d4-e5f6-4a5b-8c9d-0123456789ab', name: 'د. أحمد محمد', email: 'admin@mediscan.ai', phoneNumber: '01000000000', password: '123', role: 'Admin', status: 'Active', lastLogin: Date.now() - 3600000 },
+  { id: 'b2c3d4e5-f6a7-4b5c-9d0e-1234567890bc', name: 'د. سارة علي', email: 'sara@mediscan.ai', phoneNumber: '01100000000', password: '123', role: 'Doctor', status: 'Active', lastLogin: Date.now() - 86400000 },
+  { id: 'c3d4e5f6-a7b8-4c5d-0e1f-2345678901cd', name: 'أ. سامي السيد', email: 'patient@mediscan.ai', phoneNumber: '01200000000', password: '123', role: 'Patient', status: 'Active', lastLogin: Date.now() - 400000, assignedDoctorId: 'b2c3d4e5-f6a7-4b5c-9d0e-1234567890bc' },
 ];
 
 /**

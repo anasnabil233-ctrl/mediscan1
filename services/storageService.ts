@@ -155,7 +155,9 @@ export const syncLocalUsersToRemote = async () => {
                 permissions: user.permissions
             });
             
-            if (error) console.error(`Error syncing user ${user.name}:`, error);
+            if (error) {
+                console.error(`Error syncing user ${user.name}:`, JSON.stringify(error, null, 2));
+            }
         }
     } catch (e) {
         console.error("Error in syncLocalUsersToRemote:", e);
