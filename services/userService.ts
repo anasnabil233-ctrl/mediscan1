@@ -1,5 +1,6 @@
 import { User, UserRole } from '../types';
 import { supabase } from './supabaseClient';
+import { saveUserToDB, getAllUsersFromDB } from './db';
 
 const USERS_KEY = 'mediscan_users';
 
@@ -10,10 +11,38 @@ const MOCK_USERS: User[] = [
   { id: '3', name: 'أ. سامي السيد', email: 'patient@mediscan.ai', phoneNumber: '01200000000', password: '123', role: 'Patient', status: 'Active', lastLogin: Date.now() - 400000, assignedDoctorId: '2' },
 ];
 
+/**
+ * Initializes users by checking LocalStorage, then DB, then Mock.
+ * Ensures DB is synced with current state.
+ */
+const initializeUsers = async () => {
+    const stored = localStorage.getItem(USERS_KEY);
+    if (stored) {
+        // Ensure these exist in DB too
+        const users = JSON.parse(stored) as User[];
+        for (const u of users) {
+            await saveUserToDB(u);
+        }
+    } else {
+        // Try DB
+        const dbUsers = await getAllUsersFromDB();
+        if (dbUsers.length > 0) {
+            localStorage.setItem(USERS_KEY, JSON.stringify(dbUsers));
+        } else {
+            // Fallback to Mock
+            localStorage.setItem(USERS_KEY, JSON.stringify(MOCK_USERS));
+            for (const u of MOCK_USERS) {
+                await saveUserToDB(u);
+            }
+        }
+    }
+};
+// Trigger initialization
+initializeUsers();
+
 export const getUsers = (): User[] => {
   const stored = localStorage.getItem(USERS_KEY);
   if (!stored) {
-    localStorage.setItem(USERS_KEY, JSON.stringify(MOCK_USERS));
     return MOCK_USERS;
   }
   return JSON.parse(stored);
@@ -83,7 +112,7 @@ export const loginUser = async (email: string, password?: string): Promise<User 
       return null;
     }
     user.lastLogin = Date.now();
-    saveUser(user); // Update last login in local storage
+    saveUser(user); // Update last login in local storage AND DB
     return user;
   }
   return null;
@@ -92,8 +121,6 @@ export const loginUser = async (email: string, password?: string): Promise<User 
 // --- User Management ---
 
 export const saveUser = (user: User): User[] => {
-  // Only updates local storage. 
-  // For Supabase, this would require Admin API calls which are complex for this snippet.
   const users = getUsers();
   const index = users.findIndex(u => u.id === user.id);
   
@@ -107,18 +134,24 @@ export const saveUser = (user: User): User[] => {
     users.push(user);
   }
   
+  // 1. Save to Local Storage (RAM/Session)
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  
+  // 2. Save to IndexedDB (Persistence for Backup)
+  saveUserToDB(user);
+
   return users;
 };
 
 export const deleteUser = (id: string): User[] => {
   const users = getUsers().filter(u => u.id !== id);
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  // Note: We are not deleting from IndexedDB in this snippet to keep it simple, 
+  // but a real implementation should handle soft deletes.
   return users;
 };
 
 export const updatePassword = (userId: string, oldPass: string, newPass: string): { success: boolean; message: string } => {
-  // Does not sync with Supabase in this demo for simplicity
   const users = getUsers();
   const userIndex = users.findIndex(u => u.id === userId);
 
@@ -131,7 +164,9 @@ export const updatePassword = (userId: string, oldPass: string, newPass: string)
 
   user.password = newPass;
   users[userIndex] = user;
+  
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  saveUserToDB(user); // Persist to DB
   
   const currentUserJson = localStorage.getItem('mediscan_user');
   if (currentUserJson) {
@@ -160,7 +195,9 @@ export const resetPassword = (email: string, phone: string, newPass: string): { 
 
   user.password = newPass;
   users[userIndex] = user;
+  
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  saveUserToDB(user); // Persist to DB
 
   return { success: true, message: 'تم إعادة تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.' };
 };
@@ -180,7 +217,9 @@ export const updateUserProfile = (userId: string, name: string, email: string, p
     user.phoneNumber = phoneNumber;
     
     users[userIndex] = user;
+    
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    saveUserToDB(user); // Persist to DB
 
     const currentUserJson = localStorage.getItem('mediscan_user');
     if (currentUserJson) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fileToGenerativePart, analyzeMedicalImage } from './services/geminiService';
-import { saveRecord, loadHistory, deleteRecord, syncPendingRecords } from './services/storageService';
+import { saveRecord, loadHistory, deleteRecord, syncPendingRecords, syncAllData } from './services/storageService';
+import { checkConnection } from './services/supabaseClient';
 import { AnalysisResult, AppState, SavedRecord, User, AnalysisOptions } from './types';
 import { getPatients } from './services/userService';
 import Header from './components/Header';
@@ -15,7 +16,7 @@ import SpecialtiesPage from './components/SpecialtiesPage';
 import DatabasePage from './components/DatabasePage';
 import HomePage from './components/HomePage';
 import ChatWidget from './components/ChatWidget';
-import { Activity, HeartPulse, WifiOff, RefreshCw } from 'lucide-react';
+import { Activity, HeartPulse, WifiOff, RefreshCw, Database } from 'lucide-react';
 
 const App: React.FC = () => {
   // Auth State
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   // Network State
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [dbConnected, setDbConnected] = useState(false);
 
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -65,6 +67,42 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Initial Database Connection & Sync
+    const initializeApp = async () => {
+       if (navigator.onLine) {
+           console.log("App opened: Initiating Database Connection & Sync...");
+           setIsSyncing(true);
+           
+           try {
+             // 1. Verify Connection
+             const isConnected = await checkConnection();
+             setDbConnected(isConnected);
+             if (isConnected) {
+                 console.log("Database connected successfully.");
+             } else {
+                 console.warn("Database connection check returned false.");
+             }
+
+             // 2. Perform Full Sync (Two-Way)
+             const syncResult = await syncAllData();
+             console.log("Initial Sync Complete:", syncResult);
+           } catch(e) {
+             console.error("Initial sync failed:", e);
+           } finally {
+             setIsSyncing(false);
+           }
+           
+           // Refresh data if user is logged in
+           const storedUser = localStorage.getItem('mediscan_user');
+           if (storedUser) {
+               const user = JSON.parse(storedUser);
+               loadAndFilterHistory(user);
+           }
+       }
+    };
+
+    initializeApp();
 
     // Check auth
     const storedUser = localStorage.getItem('mediscan_user');
@@ -89,9 +127,8 @@ const App: React.FC = () => {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      const count = await syncPendingRecords();
-      if (count > 0 && currentUser) {
-        console.log(`Synced ${count} records.`);
+      await syncAllData(); // Use the robust sync
+      if (currentUser) {
         loadAndFilterHistory(currentUser); // Refresh to show synced status
       }
     } catch (e) {
@@ -133,6 +170,7 @@ const App: React.FC = () => {
     localStorage.setItem('mediscan_user', JSON.stringify(user));
     setCurrentUser(user);
     loadAndFilterHistory(user);
+    handleSync(); // Sync on login
     
     if (user.role === 'Admin' || user.role === 'Doctor') {
       setPatientsList(getPatients());
@@ -159,8 +197,6 @@ const App: React.FC = () => {
 
   const handleFileSelect = async (file: File, category: string, scanDate: string | undefined, options: AnalysisOptions) => {
     if (!isOnline) {
-      // Optional: block analysis if offline, or allow if Gemini logic was local (it's not).
-      // Since Gemini requires API, we must block analysis but allow viewing/saving existing.
       alert("عذراً، يجب أن تكون متصلاً بالإنترنت لتحليل صور جديدة. يمكنك تصفح السجل أثناء وضع عدم الاتصال.");
       return;
     }
@@ -278,7 +314,17 @@ const App: React.FC = () => {
   };
 
   if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} />;
+    return (
+        <>
+            {isSyncing && (
+                <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2 fixed top-0 left-0 right-0 z-[100]">
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>جاري الاتصال بقاعدة البيانات...</span>
+                </div>
+            )}
+            <LoginPage onLogin={handleLogin} />
+        </>
+    );
   }
 
   return (
@@ -293,8 +339,14 @@ const App: React.FC = () => {
       {isOnline && isSyncing && (
          <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2">
           <RefreshCw size={14} className="animate-spin" />
-          <span>جاري مزامنة البيانات...</span>
+          <span>جاري الاتصال بقاعدة البيانات ومزامنة البيانات...</span>
         </div>
+      )}
+      {isOnline && !isSyncing && dbConnected && currentUser.role === 'Admin' && currentView === 'database' && (
+         <div className="bg-green-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2">
+            <Database size={14} />
+            <span>متصل بقاعدة البيانات</span>
+         </div>
       )}
 
       <Header 

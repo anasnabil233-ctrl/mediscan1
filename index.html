@@ -81,7 +81,9 @@
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
     "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.0.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3"
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "path": "https://esm.sh/path@^0.12.7",
+    "fs": "https://esm.sh/fs@^0.0.1-security"
   }
 }
 </script>
@@ -101,6 +103,19 @@
 
       // Global Error Handler
       window.onerror = function(message, source, lineno, colno, error) {
+        const msgStr = String(message || '');
+        // Ignore Service Worker / Script URL errors common in previews
+        if (
+            msgStr.includes('Service Worker') || 
+            msgStr.includes('serviceWorker') || 
+            msgStr.includes('scriptURL') ||
+            msgStr.includes('عامل الخدمة') ||
+            msgStr.includes('مفتاح API')
+        ) {
+          console.warn('Ignored Non-Critical Error:', msgStr);
+          return true;
+        }
+
         console.error("Global Error:", message, error);
         
         // If the app hasn't loaded (root still has loading spinner), show the error
@@ -123,8 +138,21 @@
       
       // Catch unhandled promise rejections (like dynamic import failures)
       window.onunhandledrejection = function(event) {
+         const msg = event.reason ? (event.reason.message || event.reason.toString()) : '';
+         
+         // Don't show error overlay for network errors of service worker
+         if (
+             msg.includes('serviceWorker') || 
+             msg.includes('Service Worker') || 
+             msg.includes('scriptURL') || 
+             msg.includes('عامل الخدمة')
+         ) {
+             console.warn("Ignored Unhandled Rejection:", msg);
+             return;
+         }
+         
          console.error("Unhandled Rejection:", event.reason);
-         window.onerror(event.reason.message || event.reason, null, null, null, event.reason);
+         window.onerror(msg, null, null, null, event.reason);
       };
     </script>
   </head>
@@ -143,15 +171,27 @@
     <script type="module" src="./index.tsx"></script>
 
     <script>
+      // Skip Service Worker in unstable preview environments to prevent origin errors
+      // e.g., cloudshell, stackblitz, codesandbox
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js')
+          const hostname = window.location.hostname;
+          const isPreview = hostname.includes('usercontent.goog') || 
+                            hostname.includes('webcontainer.io') ||
+                            hostname.includes('stackblitz') ||
+                            hostname.includes('codesandbox');
+          
+          if (isPreview) {
+            console.log('Service Worker disabled in preview environment to avoid origin mismatch errors.');
+            return;
+          }
+
+          navigator.serviceWorker.register('./sw.js')
             .then(registration => {
-              // registration.update(); 
-              console.log('SW registered: ', registration);
+              console.log('SW registered successfully');
             })
             .catch(registrationError => {
-              console.log('SW registration failed: ', registrationError);
+              console.warn('Service Worker registration failed:', registrationError.message);
             });
         });
       }

@@ -74,7 +74,7 @@ export const loadHistory = async (): Promise<SavedRecord[]> => {
 /**
  * Fetches data from Supabase and updates local IndexedDB
  */
-const syncRemoteToLocal = async () => {
+export const syncRemoteToLocal = async () => {
   if (!supabase) return;
 
   const { data, error } = await supabase
@@ -144,6 +144,28 @@ export const syncPendingRecords = async (): Promise<number> => {
   }
 
   return syncedCount;
+};
+
+/**
+ * Performs a full two-way sync (Push pending, then Pull latest).
+ * Should be called on app startup.
+ */
+export const syncAllData = async (): Promise<{ pulled: boolean; pushedCount: number }> => {
+    if (!supabase || !navigator.onLine) return { pulled: false, pushedCount: 0 };
+    
+    console.log("Creating connection to database and syncing...");
+    
+    // 1. Push Local -> Remote
+    const pushedCount = await syncPendingRecords();
+    
+    // 2. Pull Remote -> Local
+    try {
+        await syncRemoteToLocal();
+        return { pulled: true, pushedCount };
+    } catch (e) {
+        console.error("Sync pull failed", e);
+        return { pulled: false, pushedCount };
+    }
 };
 
 export const deleteRecord = async (id: string): Promise<SavedRecord[]> => {

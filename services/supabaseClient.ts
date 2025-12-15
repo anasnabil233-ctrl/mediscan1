@@ -12,3 +12,21 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
 export const isSupabaseConfigured = () => {
   return !!supabase;
 };
+
+/**
+ * Pings the database to verify connection
+ */
+export const checkConnection = async (): Promise<boolean> => {
+  if (!supabase) return false;
+  try {
+    const { count, error } = await supabase.from('records').select('*', { count: 'exact', head: true });
+    if (error) {
+      console.warn('Supabase connection check failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('Supabase connection check exception:', e);
+    return false;
+  }
+};

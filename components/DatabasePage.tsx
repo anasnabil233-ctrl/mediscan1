@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Database, Server, HardDrive, Users, RefreshCw, Cloud, Wifi, WifiOff, AlertTriangle, CheckCircle2, Download, Upload, FileJson } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
-import { getAllRecordsFromDB, addRecordToDB } from '../services/db';
-import { getUsers } from '../services/userService';
-import { syncPendingRecords } from '../services/storageService';
-import { SavedRecord } from '../types';
+import { getAllRecordsFromDB, addRecordToDB, getAllUsersFromDB, saveUserToDB } from '../services/db';
+import { getUsers, saveUser } from '../services/userService';
+import { syncPendingRecords, syncRemoteToLocal } from '../services/storageService';
+import { SavedRecord, User } from '../types';
 
 const DatabasePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,9 @@ const DatabasePage: React.FC = () => {
     try {
       // 1. Get Local DB Stats
       const localRecords = await getAllRecordsFromDB();
-      const users = getUsers();
+      const localUsers = await getAllUsersFromDB();
+      // Fallback if DB is empty but localStorage has users (first load scenario)
+      const displayUserCount = localUsers.length > 0 ? localUsers.length : getUsers().length;
       
       // 2. Get Remote DB Stats (if connected)
       let remoteCount = 0;
@@ -66,7 +68,7 @@ const DatabasePage: React.FC = () => {
         localRecords: localRecords.length,
         remoteRecords: remoteCount,
         pendingSync: localRecords.filter(r => !r.synced).length,
-        usersCount: users.length,
+        usersCount: displayUserCount,
         lastSyncTime: new Date().toLocaleTimeString('ar-EG')
       });
       setConnectionStatus(isConnected ? 'connected' : 'disconnected');
@@ -88,6 +90,7 @@ const DatabasePage: React.FC = () => {
     setIsSyncing(true);
     try {
       await syncPendingRecords();
+      await syncRemoteToLocal(); // Also pull new data
       await fetchStats(); // Refresh stats after sync
     } catch (e) {
       console.error("Manual sync failed:", e);
@@ -100,19 +103,51 @@ const DatabasePage: React.FC = () => {
 
   const handleExportBackup = async () => {
     try {
-      const records = await getAllRecordsFromDB();
-      if (records.length === 0) {
-        alert("لا توجد بيانات لتصديرها.");
+      let records = await getAllRecordsFromDB();
+      let users = await getAllUsersFromDB();
+
+      // Fallback: If DB users empty, get from localStorage
+      if (users.length === 0) {
+          users = getUsers();
+          // Auto-persist to DB for next time
+          for (const u of users) await saveUserToDB(u);
+      }
+
+      // AUTO-FIX: If local is empty but we are online, try to pull from cloud immediately
+      if (records.length === 0 && navigator.onLine && supabase) {
+          console.log("Local DB records empty, attempting to fetch from cloud before backup...");
+          setIsSyncing(true);
+          try {
+             await syncRemoteToLocal();
+             records = await getAllRecordsFromDB(); // Fetch again after sync
+             await fetchStats(); // Update UI stats
+          } catch (e) {
+             console.error("Auto-sync failed during backup:", e);
+          } finally {
+             setIsSyncing(false);
+          }
+      }
+
+      if (records.length === 0 && users.length === 0) {
+        alert("لا توجد بيانات لتصديرها. (القاعدة المحلية والسحابية فارغة)");
         return;
       }
 
-      const dataStr = JSON.stringify(records, null, 2);
+      // Create Backup Package
+      const backupData = {
+          version: 1,
+          timestamp: new Date().toISOString(),
+          users: users,
+          records: records
+      };
+
+      const dataStr = JSON.stringify(backupData, null, 2);
       const blob = new Blob([dataStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `mediscan_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `mediscan_full_backup_${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -125,6 +160,8 @@ const DatabasePage: React.FC = () => {
 
   const handleImportClick = () => {
     if (fileInputRef.current) {
+      // Clear value to allow re-selecting the same file if needed
+      fileInputRef.current.value = '';
       fileInputRef.current.click();
     }
   };
@@ -138,8 +175,7 @@ const DatabasePage: React.FC = () => {
       return;
     }
 
-    if (!window.confirm("هل أنت متأكد؟ سيتم دمج البيانات المستوردة مع البيانات الحالية.")) {
-        // Reset input so change event can fire again for same file
+    if (!window.confirm("تحذير: سيتم دمج البيانات المستوردة مع البيانات الحالية. في حال وجود تعارض، سيتم تحديث البيانات الحالية بالبيانات المستوردة. هل تريد المتابعة؟")) {
         event.target.value = '';
         return;
     }
@@ -151,31 +187,57 @@ const DatabasePage: React.FC = () => {
       try {
         const content = e.target?.result as string;
         const parsedData = JSON.parse(content);
+        
+        let recordsToImport: SavedRecord[] = [];
+        let usersToImport: User[] = [];
 
-        if (!Array.isArray(parsedData)) {
-          throw new Error("تنسيق الملف غير صحيح. يجب أن يكون قائمة من السجلات.");
+        // Determine format (Old Array vs New Object)
+        if (Array.isArray(parsedData)) {
+            // Old format: just records
+            recordsToImport = parsedData as SavedRecord[];
+        } else if (parsedData.records || parsedData.users) {
+            // New format
+            recordsToImport = parsedData.records || [];
+            usersToImport = parsedData.users || [];
+        } else {
+            throw new Error("تنسيق الملف غير معروف.");
         }
 
-        let importedCount = 0;
-        for (const item of parsedData) {
-          // Basic validation to check if it looks like a SavedRecord
+        let importedRecordsCount = 0;
+        let importedUsersCount = 0;
+
+        // Import Records
+        for (const item of recordsToImport) {
           if (item.id && item.result && item.timestamp) {
-             // Force synced=false so it tries to sync to cloud if re-imported
-             // OR keep original state. Let's keep original state but ensure type safety.
              const record = item as SavedRecord;
-             await addRecordToDB(record);
-             importedCount++;
+             // Mark as unsynced so it gets pushed to cloud next sync
+             await addRecordToDB({ ...record, synced: false });
+             importedRecordsCount++;
           }
         }
 
-        alert(`تم استرداد ${importedCount} سجل بنجاح.`);
-        await fetchStats();
+        // Import Users
+        for (const user of usersToImport) {
+            if (user.id && user.email && user.role) {
+                // Save to DB (Persistent)
+                await saveUserToDB(user);
+                // Also update runtime/localStorage via user service (Session)
+                saveUser(user); 
+                importedUsersCount++;
+            }
+        }
+
+        const msg = `تم استرداد البيانات بنجاح:\n- ${importedRecordsCount} سجل طبي\n- ${importedUsersCount} مستخدم\n\nسيتم إعادة تحميل التطبيق لتطبيق التغييرات.`;
+        alert(msg);
+        
+        // RELOAD IS CRITICAL: Ensures App.tsx and UserService reload data from DB/Local Storage
+        window.location.reload();
 
       } catch (err) {
         console.error("Import error:", err);
         alert("فشل استيراد الملف. تأكد من أن الملف صالح ولم يتعرض للتلف.");
-      } finally {
         setIsImporting(false);
+      } finally {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
@@ -222,7 +284,7 @@ const DatabasePage: React.FC = () => {
             <span className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">محلي (IndexedDB)</span>
           </div>
           <div className="text-3xl font-bold text-slate-800 mb-1">{stats.localRecords}</div>
-          <p className="text-sm text-slate-500">إجمالي السجلات المحفوظة محلياً</p>
+          <p className="text-sm text-slate-500">إجمالي السجلات الطبية</p>
         </div>
 
         {/* Remote DB Stat */}
@@ -259,7 +321,7 @@ const DatabasePage: React.FC = () => {
             </div>
           </div>
           <div className="text-3xl font-bold text-slate-800 mb-1">{stats.usersCount}</div>
-          <p className="text-sm text-slate-500">إجمالي المستخدمين المسجلين</p>
+          <p className="text-sm text-slate-500">إجمالي المستخدمين (محلي)</p>
         </div>
       </div>
 
@@ -288,12 +350,13 @@ const DatabasePage: React.FC = () => {
 
                 <button
                   onClick={handleForceSync}
-                  disabled={isSyncing || !isOnline || stats.pendingSync === 0}
+                  disabled={isSyncing || !isOnline}
                   className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                    <RefreshCw size={20} className={isSyncing ? "animate-spin" : ""} />
                    {isSyncing ? 'جاري المزامنة...' : 'مزامنة السجلات الآن'}
                 </button>
+                <p className="text-xs text-slate-400 mt-2 text-center">المزامنة تشمل السجلات الطبية فقط حالياً.</p>
             </div>
          </div>
 
@@ -301,11 +364,15 @@ const DatabasePage: React.FC = () => {
          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden h-full">
             <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
                <FileJson size={18} className="text-slate-600" />
-               <h3 className="font-bold text-slate-800">النسخ الاحتياطي والاستعادة</h3>
+               <h3 className="font-bold text-slate-800">النسخ الاحتياطي الشامل</h3>
             </div>
             <div className="p-6">
                <p className="text-sm text-slate-500 mb-6">
-                  يمكنك تحميل نسخة كاملة من قاعدة البيانات المحلية (ملف JSON) واستعادتها في أي وقت أو نقلها لجهاز آخر.
+                  تحميل نسخة كاملة (ملف JSON) تحتوي على:
+                  <br />
+                  <span className="font-bold text-slate-700">- السجلات الطبية والتحاليل.</span>
+                  <br />
+                  <span className="font-bold text-slate-700">- بيانات المستخدمين وكلمات المرور.</span>
                </p>
                
                <div className="flex flex-col sm:flex-row gap-4">
@@ -348,13 +415,7 @@ const DatabasePage: React.FC = () => {
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-slate-600 text-sm">إصدار التطبيق</span>
-                      <span className="font-mono text-slate-800 dir-ltr">v1.0.0</span>
-                   </div>
-                   <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                      <span className="text-slate-600 text-sm">المتصفح</span>
-                      <span className="font-mono text-slate-800 text-xs truncate max-w-[200px]" title={navigator.userAgent}>
-                         {navigator.userAgent}
-                      </span>
+                      <span className="font-mono text-slate-800 dir-ltr">v1.1.0</span>
                    </div>
                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-slate-600 text-sm">اتصال Supabase</span>
@@ -365,7 +426,7 @@ const DatabasePage: React.FC = () => {
                    </div>
                    <div className="flex justify-between items-center py-2 border-b border-slate-100">
                       <span className="text-slate-600 text-sm">التخزين المؤقت</span>
-                      <span className="font-mono text-slate-800">IndexedDB Active</span>
+                      <span className="font-mono text-slate-800">IndexedDB (Records + Users)</span>
                    </div>
                </div>
             </div>
