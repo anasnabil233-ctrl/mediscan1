@@ -1,6 +1,7 @@
 import React from 'react';
-import { Activity, History, LogOut, Users, LayoutDashboard, HeartPulse, UserCog, Stethoscope, Home, Download, Database } from 'lucide-react';
+import { History, LogOut, Users, LayoutDashboard, HeartPulse, UserCog, Stethoscope, Home, Download, Database } from 'lucide-react';
 import { UserRole } from '../types';
+import Logo from './Logo';
 
 interface HeaderProps {
   currentView: 'home' | 'dashboard' | 'users' | 'profile' | 'specialties' | 'database';
@@ -19,9 +20,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenHistory,
         <div className="flex justify-between items-center h-16">
           
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('home')}>
-            <div className="bg-teal-500 p-2 rounded-lg text-white">
-              <Activity size={24} />
-            </div>
+            <Logo size={40} className="shadow-sm rounded-xl" />
             <div>
               <h1 className="text-xl font-bold text-slate-800">تحليل الأشعة الذكي</h1>
               <p className="text-xs text-slate-500">MediScan AI</p>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Activity, Mail, Lock, ArrowLeft, Phone, Key, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, ArrowLeft, Phone, Key, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { loginUser, resetPassword } from '../services/userService';
 import { User } from '../types';
+import Logo from './Logo';
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -104,8 +105,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-fade-in-up">
         
         <div className="bg-teal-600 p-8 text-center">
-          <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-            <Activity className="text-white" size={32} />
+          <div className="flex justify-center mb-4">
+            <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm shadow-inner">
+               <Logo size={64} />
+            </div>
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">مرحباً بك في MediScan AI</h1>
           <p className="text-teal-100 text-sm">منصة ذكية لتحليل الصور الطبية</p>
