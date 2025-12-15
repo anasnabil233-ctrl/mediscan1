@@ -35,7 +35,14 @@ export interface SavedRecord {
   synced?: boolean; // True if saved to cloud, false if local only
 }
 
-export type UserRole = 'Admin' | 'Doctor' | 'Patient';
+export type UserRole = 'Admin' | 'Doctor' | 'Patient' | 'Supervisor';
+
+export type AppPermission = 
+  | 'manage_users'       // Can add/edit users (except Admins)
+  | 'view_dashboard'     // Can access the main scanning dashboard
+  | 'manage_database'    // Can access database stats and sync
+  | 'manage_specialties' // Can add/edit specialties
+  | 'view_reports';      // Can view patient reports
 
 export interface User {
   id: string;
@@ -47,6 +54,7 @@ export interface User {
   status: 'Active' | 'Inactive';
   lastLogin?: number;
   assignedDoctorId?: string; // Optional: Links a patient to a specific doctor
+  permissions?: AppPermission[]; // List of specific permissions for Supervisors
 }
 
 export interface ChatMessage {

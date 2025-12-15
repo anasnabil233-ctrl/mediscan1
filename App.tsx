@@ -6,6 +6,7 @@ import { AnalysisResult, AppState, SavedRecord, User, AnalysisOptions } from './
 import { getPatients } from './services/userService';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import BottomNav from './components/BottomNav';
 import FileUpload from './components/FileUpload';
 import ResultsView from './components/ResultsView';
 import HistoryModal from './components/HistoryModal';
@@ -17,6 +18,7 @@ import DatabasePage from './components/DatabasePage';
 import HomePage from './components/HomePage';
 import ChatWidget from './components/ChatWidget';
 import { Activity, HeartPulse, WifiOff, RefreshCw, Database } from 'lucide-react';
+import { App as CapacitorApp } from '@capacitor/app';
 
 const App: React.FC = () => {
   // Auth State
@@ -50,6 +52,19 @@ const App: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
+    // Hardware Back Button Handler for Android
+    CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+        if (historyOpen) {
+            setHistoryOpen(false);
+        } else if (currentView !== 'home') {
+            setCurrentView('home');
+        } else if (!canGoBack) {
+            CapacitorApp.exitApp();
+        } else {
+            window.history.back();
+        }
+    });
+
     // Network Listeners
     const handleOnline = () => {
       setIsOnline(true);
@@ -112,7 +127,7 @@ const App: React.FC = () => {
       loadAndFilterHistory(user);
       
       // Load patients list if admin or doctor
-      if (user.role === 'Admin' || user.role === 'Doctor') {
+      if (user.role === 'Admin' || user.role === 'Doctor' || user.role === 'Supervisor') {
         setPatientsList(getPatients());
       }
     }
@@ -121,8 +136,9 @@ const App: React.FC = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      CapacitorApp.removeAllListeners();
     };
-  }, []);
+  }, [historyOpen, currentView]); // Dependency array includes historyOpen/currentView for back button logic
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -172,7 +188,7 @@ const App: React.FC = () => {
     loadAndFilterHistory(user);
     handleSync(); // Sync on login
     
-    if (user.role === 'Admin' || user.role === 'Doctor') {
+    if (user.role === 'Admin' || user.role === 'Doctor' || user.role === 'Supervisor') {
       setPatientsList(getPatients());
       setCurrentView('home');
     } else {
@@ -233,7 +249,7 @@ const App: React.FC = () => {
       setResult(analysisResult);
       setAppState(AppState.SUCCESS);
       
-      if (currentUser?.role === 'Admin' || currentUser?.role === 'Doctor') {
+      if (currentUser?.role === 'Admin' || currentUser?.role === 'Doctor' || currentUser?.role === 'Supervisor') {
         setPatientsList(getPatients());
       }
       
@@ -313,11 +329,19 @@ const App: React.FC = () => {
     setCurrentCategory('');
   };
 
+  // Helper to check permission
+  const hasPermission = (permission: string) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'Admin') return true;
+    if (currentUser.role === 'Supervisor' && currentUser.permissions?.includes(permission as any)) return true;
+    return false;
+  };
+
   if (!currentUser) {
     return (
         <>
             {isSyncing && (
-                <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2 fixed top-0 left-0 right-0 z-[100]">
+                <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2 fixed top-0 left-0 right-0 z-[100] pt-[env(safe-area-inset-top)]">
                     <RefreshCw size={14} className="animate-spin" />
                     <span>جاري الاتصال بقاعدة البيانات...</span>
                 </div>
@@ -328,25 +352,19 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans">
+    <div className="min-h-screen flex flex-col font-sans pb-16 md:pb-0">
       {/* Network Status Bar */}
       {!isOnline && (
-        <div className="bg-slate-800 text-white text-xs py-1 text-center flex items-center justify-center gap-2">
+        <div className="bg-slate-800 text-white text-xs py-1 text-center flex items-center justify-center gap-2 sticky top-0 z-[60]">
           <WifiOff size={14} />
-          <span>أنت الآن في وضع عدم الاتصال. يمكنك تصفح السجل، وسيتم مزامنة البيانات عند عودة الإنترنت.</span>
+          <span>وضع عدم الاتصال.</span>
         </div>
       )}
       {isOnline && isSyncing && (
-         <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2">
+         <div className="bg-teal-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2 sticky top-0 z-[60]">
           <RefreshCw size={14} className="animate-spin" />
-          <span>جاري الاتصال بقاعدة البيانات ومزامنة البيانات...</span>
+          <span>جاري المزامنة...</span>
         </div>
-      )}
-      {isOnline && !isSyncing && dbConnected && currentUser.role === 'Admin' && currentView === 'database' && (
-         <div className="bg-green-600 text-white text-xs py-1 text-center flex items-center justify-center gap-2">
-            <Database size={14} />
-            <span>متصل بقاعدة البيانات</span>
-         </div>
       )}
 
       <Header 
@@ -355,6 +373,7 @@ const App: React.FC = () => {
         onOpenHistory={() => setHistoryOpen(true)} 
         onLogout={handleLogout}
         userRole={currentUser.role}
+        userPermissions={currentUser.permissions}
         userName={currentUser.name}
         onInstall={deferredPrompt ? handleInstallClick : undefined}
       />
@@ -383,15 +402,15 @@ const App: React.FC = () => {
             </div>
         )}
 
-        {/* VIEW: Database Management (Admin Only) */}
-        {currentView === 'database' && currentUser.role === 'Admin' && (
+        {/* VIEW: Database Management (Admin Or Supervisor with Permission) */}
+        {currentView === 'database' && hasPermission('manage_database') && (
            <div className="p-4 md:p-8">
               <DatabasePage />
            </div>
         )}
 
-        {/* VIEW: Users (Admin AND Doctor) */}
-        {currentView === 'users' && (currentUser.role === 'Admin' || currentUser.role === 'Doctor') && (
+        {/* VIEW: Users (Admin Or Doctor Or Supervisor with Permission) */}
+        {currentView === 'users' && (currentUser.role === 'Admin' || currentUser.role === 'Doctor' || hasPermission('manage_users')) && (
           <div className="p-4 md:p-8">
              <UsersPage currentUser={currentUser} />
           </div>
@@ -424,7 +443,7 @@ const App: React.FC = () => {
                     <div className="max-w-7xl mx-auto w-full">
                     
                     {currentUser.role !== 'Patient' && (
-                        <div className="text-center mb-10 space-y-2">
+                        <div className="text-center mb-10 space-y-2 hidden md:block">
                             <h2 className="text-3xl md:text-4xl font-bold text-slate-800">
                             تحليل الصور الطبية بالذكاء الاصطناعي
                             </h2>
@@ -440,7 +459,7 @@ const App: React.FC = () => {
                         {currentUser.role !== 'Patient' && (
                         <div className={`lg:col-span-5 space-y-6 ${appState === AppState.SUCCESS ? 'lg:sticky lg:top-24' : 'mx-auto w-full max-w-2xl lg:col-span-12'}`}>
                         
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                             {previewUrl ? (
                             <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-black aspect-[4/3] flex items-center justify-center group">
                                 <img 
@@ -518,6 +537,15 @@ const App: React.FC = () => {
             </div>
         )}
       </main>
+
+      {/* Bottom Nav for Mobile */}
+      <BottomNav 
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        onOpenHistory={() => setHistoryOpen(true)}
+        userRole={currentUser.role}
+        userPermissions={currentUser.permissions}
+      />
 
       <HistoryModal 
         isOpen={historyOpen}
