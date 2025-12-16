@@ -5,28 +5,36 @@ import { AnalysisResult, AnalysisOptions } from "../types";
  * Helper to securely retrieve the API Key from various sources
  */
 const getApiKey = (): string => {
-  // 1. Try standard Vite environment variable
+  // ------------------------------------------------------------------
+  // هام جداً: لحل مشكلة التطبيق على الأندرويد
+  // قم بلصق مفتاح API الخاص بك هنا مباشرة بين علامتي التنصيص
+  // ------------------------------------------------------------------
+  const MANUALLY_PASTED_KEY = "" as string; // <--- ضع مفتاحك هنا مثال: "AIzaSy..."
+
+  // 1. Priority: Manual Key (Fixes Android Issue)
+  if (MANUALLY_PASTED_KEY && MANUALLY_PASTED_KEY.trim() !== "") {
+    return MANUALLY_PASTED_KEY;
+  }
+
+  // 2. Try standard Vite environment variable
   const metaEnv = (import.meta as any).env;
   if (metaEnv?.VITE_API_KEY) return metaEnv.VITE_API_KEY;
   if (metaEnv?.API_KEY) return metaEnv.API_KEY;
 
-  // 2. Try global process (injected by build or polyfill)
+  // 3. Try global process (injected by build or polyfill)
   // @ts-ignore
   if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
     // @ts-ignore
     return process.env.API_KEY;
   }
   
-  // 3. Check window object (polyfill from index.html)
+  // 4. Check window object (polyfill from index.html)
   // @ts-ignore
   if (typeof window !== 'undefined' && window.process && window.process.env && window.process.env.API_KEY) {
      // @ts-ignore
      return window.process.env.API_KEY;
   }
 
-  // 4. Fallback: Return empty string (Application will throw specific error below)
-  // هام: إذا كنت تواجه مشكلة في بناء ملف APK، يمكنك وضع المفتاح مباشرة هنا بين علامتي التنصيص
-  // Example: return "AIzaSy...";
   return ""; 
 };
 
@@ -52,7 +60,7 @@ export const analyzeMedicalImage = async (base64Image: string, mimeType: string,
 
   // Check for API Key before initializing the client to avoid runtime crashes
   if (!apiKey) {
-    throw new Error("مفتاح API غير موجود. يرجى التأكد من إعدادات التطبيق أو وضع المفتاح في ملف .env");
+    throw new Error("مفتاح API غير موجود. يرجى التأكد من وضع المفتاح في ملف services/geminiService.ts في المتغير MANUALLY_PASTED_KEY");
   }
 
   // Initialize the client strictly when needed
