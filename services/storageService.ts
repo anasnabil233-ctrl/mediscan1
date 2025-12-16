@@ -139,6 +139,9 @@ export const syncRemoteToLocal = async () => {
 
 /**
  * Pushes Local Users to Supabase 'profiles'
+ * NOTE: This is no longer called automatically on startup to prevent
+ * overwriting server data with stale local data.
+ * It remains available for manual or specific sync operations if needed.
  */
 export const syncLocalUsersToRemote = async () => {
     if (!supabase || !navigator.onLine) return;
@@ -221,10 +224,14 @@ export const syncAllData = async (): Promise<{ pulled: boolean; pushedCount: num
     console.log("Creating connection to database and syncing ALL data...");
     
     // 1. Push Local Records -> Remote (Save anything created offline)
+    // Only records have a 'synced' flag, so this is safe.
     const pushedCount = await syncPendingRecords();
     
-    // 2. Push Local Users -> Remote
-    await syncLocalUsersToRemote();
+    // 2. SKIP Push Local Users -> Remote
+    // We do NOT push users blindly on startup because we assume the Server is the source of truth.
+    // Pushing stale local users would revert changes made on other devices.
+    // User changes are pushed immediately in 'userService.ts' when they happen.
+    // await syncLocalUsersToRemote(); 
 
     // 3. Pull Remote Records & Users -> Local (And Clear old Local)
     try {

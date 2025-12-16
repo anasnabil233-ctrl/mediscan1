@@ -102,7 +102,26 @@ const App: React.FC = () => {
              await syncAllData();
              
              // Refresh Users in memory from the fresh DB
-             await refreshLocalUsersFromDB();
+             const freshUsers = await refreshLocalUsersFromDB();
+             
+             // IMPORTANT: Refresh Current Session User
+             // If the user's data changed on server (e.g. role change), update the session.
+             // If the user was deleted on server, logout.
+             const storedUserJson = localStorage.getItem('mediscan_user');
+             if (storedUserJson) {
+                 const storedUser = JSON.parse(storedUserJson);
+                 const freshUser = freshUsers.find(u => u.id === storedUser.id);
+                 
+                 if (freshUser) {
+                     // Update session with fresh data
+                     console.log("Updating current session with fresh data");
+                     localStorage.setItem('mediscan_user', JSON.stringify(freshUser));
+                 } else {
+                     // User no longer exists in fresh data
+                     console.warn("User no longer exists in DB. Logging out.");
+                     localStorage.removeItem('mediscan_user');
+                 }
+             }
              
              console.log("Initial Cloud Sync Complete & Cache Refreshed.");
            } catch(e) {
@@ -112,12 +131,11 @@ const App: React.FC = () => {
            }
        }
 
-       // 2. Load User and Data (From the now fresh Local DB)
+       // 2. Load User and Data (From the now fresh Local DB/Storage)
        const storedUser = localStorage.getItem('mediscan_user');
        
        if (storedUser) {
           const userObj = JSON.parse(storedUser);
-          // Verify user still exists in fresh data (optional security check)
           setCurrentUser(userObj);
           
           await loadAndFilterHistory(userObj);
@@ -146,6 +164,20 @@ const App: React.FC = () => {
       await syncAllData(); 
       await refreshLocalUsersFromDB(); // Ensure users are updated
       
+      // Also refresh current user if they are logged in
+      const storedUserJson = localStorage.getItem('mediscan_user');
+      if (storedUserJson) {
+          const storedUser = JSON.parse(storedUserJson);
+          const freshUsers = getPatients(); // or getUsers, but we need full list. 
+          // Re-fetching full list just to be safe
+          const allUsers = await refreshLocalUsersFromDB(); 
+          const freshUser = allUsers.find(u => u.id === storedUser.id);
+          if (freshUser) {
+              setCurrentUser(freshUser);
+              localStorage.setItem('mediscan_user', JSON.stringify(freshUser));
+          }
+      }
+
       if (currentUser) {
         await loadAndFilterHistory(currentUser); 
         if (currentUser.role === 'Admin' || currentUser.role === 'Doctor') {
