@@ -17,7 +17,7 @@ import SpecialtiesPage from './components/SpecialtiesPage';
 import DatabasePage from './components/DatabasePage';
 import HomePage from './components/HomePage';
 import ChatWidget from './components/ChatWidget';
-import { Activity, HeartPulse, WifiOff, RefreshCw, Database } from 'lucide-react';
+import { Activity, HeartPulse, WifiOff, RefreshCw, Database, Cloud } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 
 const App: React.FC = () => {
@@ -46,6 +46,7 @@ const App: React.FC = () => {
   // Network State
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true); // New state for blocking load
   const [dbConnected, setDbConnected] = useState(false);
 
   // PWA Install State
@@ -86,51 +87,46 @@ const App: React.FC = () => {
 
     // Initial Database Connection & Sync (Auto-Connect Logic)
     const initializeApp = async () => {
-       // Load user from local storage first to show UI immediately
-       const storedUser = localStorage.getItem('mediscan_user');
-       let userObj = null;
+       setIsInitializing(true);
        
-       if (storedUser) {
-          userObj = JSON.parse(storedUser);
-          setCurrentUser(userObj);
-          // Initial local load (fast)
-          loadAndFilterHistory(userObj);
-          if (userObj.role === 'Admin' || userObj.role === 'Doctor' || userObj.role === 'Supervisor') {
-            setPatientsList(getPatients());
-          }
-       }
-
+       // 1. If Online: Force a Full Sync first (Clear Cache & Get Fresh Data)
        if (navigator.onLine) {
-           console.log("App opened: Initiating Database Connection & Sync...");
+           console.log("App opened Online: Force syncing from Cloud...");
            setIsSyncing(true);
-           
            try {
-             // 1. Verify Connection
+             // Verify Connection
              const isConnected = await checkConnection();
              setDbConnected(isConnected);
              
-             // 2. Perform Full Sync (Pull latest data from Cloud)
-             const syncResult = await syncAllData();
-             console.log("Initial Cloud Sync Complete:", syncResult);
+             // Full Sync (This clears local DB and refills from Supabase)
+             await syncAllData();
              
-             // 3. IMPORTANT: Refresh Memory/LocalStorage from IndexedDB
-             // This ensures we see new users/records that came from Supabase immediately
+             // Refresh Users in memory from the fresh DB
              await refreshLocalUsersFromDB();
              
-             // 4. Refresh UI Lists with new data
-             if (userObj) {
-                await loadAndFilterHistory(userObj);
-                if (userObj.role === 'Admin' || userObj.role === 'Doctor' || userObj.role === 'Supervisor') {
-                    setPatientsList(getPatients());
-                }
-             }
-
+             console.log("Initial Cloud Sync Complete & Cache Refreshed.");
            } catch(e) {
              console.error("Initial sync failed:", e);
            } finally {
              setIsSyncing(false);
            }
        }
+
+       // 2. Load User and Data (From the now fresh Local DB)
+       const storedUser = localStorage.getItem('mediscan_user');
+       
+       if (storedUser) {
+          const userObj = JSON.parse(storedUser);
+          // Verify user still exists in fresh data (optional security check)
+          setCurrentUser(userObj);
+          
+          await loadAndFilterHistory(userObj);
+          if (userObj.role === 'Admin' || userObj.role === 'Doctor' || userObj.role === 'Supervisor') {
+            setPatientsList(getPatients());
+          }
+       }
+
+       setIsInitializing(false);
     };
 
     initializeApp();
@@ -196,7 +192,7 @@ const App: React.FC = () => {
     setCurrentUser(user);
     loadAndFilterHistory(user);
     
-    // Trigger sync on login to ensure fresh data
+    // Force sync on login again to be sure
     handleSync(); 
     
     if (user.role === 'Admin' || user.role === 'Doctor' || user.role === 'Supervisor') {
@@ -348,18 +344,24 @@ const App: React.FC = () => {
     return false;
   };
 
+  // BLOCKING LOADING SCREEN
+  if (isInitializing) {
+     return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4" dir="rtl">
+           <div className="relative">
+              <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                 <Cloud className="text-teal-600 animate-pulse" size={24} />
+              </div>
+           </div>
+           <h2 className="text-lg font-bold text-slate-800">جاري تحميل البيانات...</h2>
+           <p className="text-sm text-slate-500">يتم مزامنة البيانات من السحابة لضمان دقة المعلومات</p>
+        </div>
+     );
+  }
+
   if (!currentUser) {
-    return (
-        <>
-            {isSyncing && (
-                <div className="bg-teal-600 text-white text-xs py-2 text-center flex items-center justify-center gap-2 fixed top-0 left-0 right-0 z-[100] pt-[env(safe-area-inset-top)] shadow-md">
-                    <RefreshCw size={14} className="animate-spin" />
-                    <span>جاري الاتصال بقاعدة البيانات السحابية وجلب البيانات...</span>
-                </div>
-            )}
-            <LoginPage onLogin={handleLogin} />
-        </>
-    );
+    return <LoginPage onLogin={handleLogin} />;
   }
 
   return (

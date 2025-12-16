@@ -1,7 +1,7 @@
 import { SavedRecord, User } from '../types';
 
 const DB_NAME = 'MediScanDB';
-const DB_VERSION = 3; // Bumped to 3 to ensure schema upgrade triggers
+const DB_VERSION = 3; 
 const STORE_RECORDS = 'records';
 const STORE_USERS = 'users';
 
@@ -24,7 +24,7 @@ export const initDB = (): Promise<IDBDatabase> => {
 
     request.onblocked = () => {
       console.warn("Database upgrade blocked. Please close other tabs of this app.");
-      alert("يرجى إغلاق علامات التبويب الأخرى للتطبيق لتحديث قاعدة البيانات.");
+      // alert("يرجى إغلاق علامات التبويب الأخرى للتطبيق لتحديث قاعدة البيانات.");
     };
 
     request.onsuccess = (event) => {
@@ -46,6 +46,29 @@ export const initDB = (): Promise<IDBDatabase> => {
       }
     };
   });
+};
+
+/**
+ * Clears all data from a specific store
+ */
+export const clearStore = async (storeName: string): Promise<void> => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([storeName], 'readwrite');
+      const store = transaction.objectStore(storeName);
+      const request = store.clear();
+
+      request.onsuccess = () => {
+          console.log(`Store ${storeName} cleared.`);
+          resolve();
+      };
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {
+    console.error(`Error clearing store ${storeName}:`, e);
+    throw e;
+  }
 };
 
 /**
@@ -127,7 +150,7 @@ export const saveUserToDB = async (user: User): Promise<void> => {
       const request = store.put(user);
 
       request.onsuccess = () => {
-          console.log(`User ${user.name} saved to DB.`);
+          // console.log(`User ${user.name} saved to DB.`);
           resolve();
       };
       request.onerror = () => reject(request.error);

@@ -1,5 +1,5 @@
 import { SavedRecord, User, UserRole } from '../types';
-import { addRecordToDB, getAllRecordsFromDB, deleteRecordFromDB, getAllUsersFromDB, saveUserToDB } from './db';
+import { addRecordToDB, getAllRecordsFromDB, deleteRecordFromDB, getAllUsersFromDB, saveUserToDB, clearStore } from './db';
 import { supabase } from './supabaseClient';
 
 /**
@@ -50,88 +50,91 @@ export const saveRecord = async (record: SavedRecord): Promise<boolean> => {
 
 /**
  * Loads history.
- * Strategy: Cache-First / Stale-While-Revalidate
- * 1. Return local records immediately.
- * 2. If online, fetch from Supabase and update local DB to ensure future offline access.
+ * Strategy: If online, prioritize fresh data (Network First).
  */
 export const loadHistory = async (): Promise<SavedRecord[]> => {
-  // 1. Get Local Data
+  // If online, we likely already did a full sync in App.tsx
+  // But we can check IndexedDB which should now be fresh.
   let localData: SavedRecord[] = [];
   try {
     localData = await getAllRecordsFromDB();
   } catch (e) {
     console.error("Error loading local history", e);
   }
-
-  // 2. Background Sync (Fire and Forget) if online
-  if (supabase && navigator.onLine) {
-    syncRemoteToLocal().catch(err => console.error("Background sync failed", err));
-  }
-
   return localData;
 };
 
 /**
- * Fetches RECORDS from Supabase and updates local IndexedDB
+ * Fetches RECORDS from Supabase and REPLACES local IndexedDB to ensure consistency
+ * This handles deletions and updates from other devices.
  */
 export const syncRemoteToLocal = async () => {
   if (!supabase) return;
 
-  // 1. Sync Records
+  // 1. Fetch ALL Records from Remote
   const { data: recordsData, error: recordsError } = await supabase
     .from('records')
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (!recordsError && recordsData) {
-    for (const item of recordsData) {
-      const record: SavedRecord = {
-        id: item.id,
-        userId: item.user_id,
-        patientName: item.patient_name,
-        timestamp: new Date(item.created_at).getTime(),
-        result: item.result,
-        imageData: item.image_data,
-        category: item.category,
-        synced: true
-      };
-      await addRecordToDB(record);
-    }
+  if (recordsError) {
+      console.error("Failed to fetch records from cloud:", recordsError);
+      throw recordsError;
   }
 
-  // 2. Sync Users (Profiles)
-  await syncRemoteUsersToLocal();
-};
+  // 2. Fetch ALL Users from Remote
+  const { data: usersData, error: usersError } = await supabase
+      .from('profiles')
+      .select('*');
 
-/**
- * Fetches USERS from Supabase 'profiles' table and updates local IndexedDB
- */
-export const syncRemoteUsersToLocal = async () => {
-    if (!supabase) return;
+  if (usersError) {
+      console.error("Failed to fetch users from cloud:", usersError);
+      throw usersError;
+  }
 
-    const { data: usersData, error: usersError } = await supabase
-        .from('profiles')
-        .select('*');
+  // 3. CLEAR Local Storage (Aggressive Sync)
+  // Only clear if we successfully fetched data to avoid wiping app when offline logic fails
+  if (recordsData) {
+      await clearStore('records');
+      
+      // Repopulate Records
+      for (const item of recordsData) {
+        const record: SavedRecord = {
+            id: item.id,
+            userId: item.user_id,
+            patientName: item.patient_name,
+            timestamp: new Date(item.created_at).getTime(),
+            result: item.result,
+            imageData: item.image_data,
+            category: item.category,
+            synced: true
+        };
+        await addRecordToDB(record);
+      }
+  }
 
-    if (!usersError && usersData) {
-        for (const item of usersData) {
-            // Map Supabase profile to Local User
-            const user: User = {
-                id: item.id,
-                name: item.name || 'Unknown',
-                email: item.email || '',
-                role: item.role as UserRole,
-                status: 'Active',
-                phoneNumber: item.phone_number,
-                assignedDoctorId: item.assigned_doctor_id,
-                password: item.password, // Sync password for custom auth compatibility
-                permissions: item.permissions, // Sync permissions array
-                lastLogin: Date.now() 
-            };
-            await saveUserToDB(user);
-        }
-        console.log(`Synced ${usersData.length} users from remote.`);
-    }
+  if (usersData) {
+      await clearStore('users');
+
+      // Repopulate Users
+      for (const item of usersData) {
+        const user: User = {
+            id: item.id,
+            name: item.name || 'Unknown',
+            email: item.email || '',
+            role: item.role as UserRole,
+            status: 'Active',
+            phoneNumber: item.phone_number,
+            assignedDoctorId: item.assigned_doctor_id,
+            password: item.password,
+            permissions: item.permissions,
+            lastLogin: Date.now() 
+        };
+        await saveUserToDB(user);
+      }
+  }
+  
+  console.log("Full sync complete: Local database matches Remote database.");
 };
 
 /**
@@ -217,15 +220,15 @@ export const syncAllData = async (): Promise<{ pulled: boolean; pushedCount: num
     
     console.log("Creating connection to database and syncing ALL data...");
     
-    // 1. Push Local Records -> Remote
+    // 1. Push Local Records -> Remote (Save anything created offline)
     const pushedCount = await syncPendingRecords();
     
     // 2. Push Local Users -> Remote
     await syncLocalUsersToRemote();
 
-    // 3. Pull Remote Records & Users -> Local
+    // 3. Pull Remote Records & Users -> Local (And Clear old Local)
     try {
-        await syncRemoteToLocal(); // This now calls syncRemoteUsersToLocal internally too
+        await syncRemoteToLocal();
         return { pulled: true, pushedCount };
     } catch (e) {
         console.error("Sync pull failed", e);
@@ -247,9 +250,6 @@ export const deleteRecord = async (id: string): Promise<SavedRecord[]> => {
       await supabase.from('records').delete().eq('id', id);
     } catch (e) {
       console.error("Supabase delete error", e);
-      // Note: If offline, the remote record remains. 
-      // A robust system needs a 'deleted_at' flag and soft deletes to sync deletions.
-      // For this implementation, we prioritize local cleanup.
     }
   }
 
