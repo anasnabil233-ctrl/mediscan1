@@ -107,10 +107,14 @@
       // Ensure process.env.API_KEY is available globally
       window.process = window.process || {};
       window.process.env = window.process.env || {};
-      // Note: The API_KEY value is usually injected by the build tool or server env
+      
+      // IMPORTANT: For Android builds, if env vars are missing, you can hardcode them here safely.
+      // If Vite injects them, this fallback won't be used (if you check availability first).
+      // Replace '' with 'YOUR_ACTUAL_API_KEY' if your build process strips .env files.
       if (!window.process.env.API_KEY) {
         window.process.env.API_KEY = ''; 
       }
+      
       // Polyfill for Supabase Env Vars (Updated with actual keys)
       if (!window.process.env.VITE_SUPABASE_URL) window.process.env.VITE_SUPABASE_URL = 'https://uxycnqyolufmlyvsbzse.supabase.co';
       if (!window.process.env.VITE_SUPABASE_ANON_KEY) window.process.env.VITE_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4eWNucXlvbHVmbWx5dnNienNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODYyMDksImV4cCI6MjA4MTI2MjIwOX0.8LHjSU4sF_mzgmuNrVjl9jHsSZz6IMB3v9ZHtfVTslw';
