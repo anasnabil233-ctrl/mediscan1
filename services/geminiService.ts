@@ -7,9 +7,9 @@ import { AnalysisResult, AnalysisOptions } from "../types";
 const getApiKey = (): string => {
   // ------------------------------------------------------------------
   // هام جداً: لحل مشكلة التطبيق على الأندرويد
-  // قم بلصق مفتاح API الخاص بك هنا مباشرة بين علامتي التنصيص
+  // تم وضع مفتاح API الخاص بك هنا مباشرة لضمان التشغيل المستقر
   // ------------------------------------------------------------------
-  const MANUALLY_PASTED_KEY = "" as string; // <--- ضع مفتاحك هنا مثال: "AIzaSy..."
+  const MANUALLY_PASTED_KEY = "AIzaSyDQUacWkmLFMgR-B85aMT_9IPRArN-Oy_o" as string; // <--- تم تحديث المفتاح بنجاح
 
   // 1. Priority: Manual Key (Fixes Android Issue)
   if (MANUALLY_PASTED_KEY && MANUALLY_PASTED_KEY.trim() !== "") {
