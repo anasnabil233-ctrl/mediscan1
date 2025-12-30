@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { AnalysisResult, User, UserRole } from '../types';
-import { CheckCircle2, AlertCircle, FileText, ClipboardList, Activity, Save, Check, User as UserIcon } from 'lucide-react';
+import { CheckCircle2, AlertCircle, FileText, ClipboardList, Activity, Save, Check, User as UserIcon, Loader2 } from 'lucide-react';
 
 interface ResultsViewProps {
   result: AnalysisResult;
-  onSave?: (targetPatientId?: string) => boolean;
+  onSave?: (targetPatientId?: string) => Promise<boolean> | boolean;
   isSaved?: boolean;
   userRole?: UserRole;
   patients?: User[];
@@ -18,20 +18,31 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   patients = []
 }) => {
   const [isSaved, setIsSaved] = useState(initialIsSaved);
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   
   const canAssignPatient = (userRole === 'Admin' || userRole === 'Doctor') && !isSaved;
 
-  const handleSave = () => {
-    if (onSave && !isSaved) {
-      // Validate selection if user is doctor/admin
+  const handleSave = async () => {
+    if (onSave && !isSaved && !isSaving) {
+      // التحقق من اختيار المريض إذا كان المستخدم طبيباً أو مديراً
       if (canAssignPatient && !selectedPatientId) {
         alert("يرجى اختيار المريض أولاً لحفظ التقرير في سجله.");
         return;
       }
       
-      const success = onSave(selectedPatientId || undefined);
-      if (success) setIsSaved(true);
+      setIsSaving(true);
+      try {
+        const success = await onSave(selectedPatientId || undefined);
+        if (success) {
+          setIsSaved(true);
+        }
+      } catch (error) {
+        console.error("Save error:", error);
+        alert("حدث خطأ أثناء محاولة حفظ التقرير.");
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -53,7 +64,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-800 mb-1">تقرير التحليل</h2>
-            <p className="text-slate-500 text-sm">تم الإنشاء بواسطة Gemini 2.5 AI</p>
+            <p className="text-slate-500 text-sm">تم الإنشاء بواسطة Gemini 3 AI</p>
           </div>
           
           <div className="flex flex-col md:flex-row items-end md:items-center gap-3">
@@ -67,6 +78,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                   className="pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 appearance-none min-w-[200px]"
                   value={selectedPatientId}
                   onChange={(e) => setSelectedPatientId(e.target.value)}
+                  disabled={isSaving}
                 >
                   <option value="">-- اختر المريض --</option>
                   {patients.map(patient => (
@@ -78,15 +90,15 @@ const ResultsView: React.FC<ResultsViewProps> = ({
 
             <button
               onClick={handleSave}
-              disabled={isSaved}
+              disabled={isSaved || isSaving}
               className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${
                 isSaved 
                 ? 'bg-slate-100 text-slate-500 cursor-default' 
-                : 'bg-teal-600 text-white hover:bg-teal-700 shadow-sm hover:shadow-md'
+                : 'bg-teal-600 text-white hover:bg-teal-700 shadow-sm hover:shadow-md disabled:opacity-70'
               }`}
             >
-              {isSaved ? <Check size={18} /> : <Save size={18} />}
-              {isSaved ? 'تم الحفظ' : 'حفظ التقرير'}
+              {isSaving ? <Loader2 size={18} className="animate-spin" /> : (isSaved ? <Check size={18} /> : <Save size={18} />)}
+              {isSaving ? 'جاري الحفظ...' : (isSaved ? 'تم الحفظ' : 'حفظ التقرير')}
             </button>
             <div className={`px-4 py-2 rounded-full border font-bold text-sm flex items-center gap-2 w-fit ${getSeverityColor(result.severity)}`}>
               <Activity size={18} />
