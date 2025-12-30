@@ -9,7 +9,7 @@ const getApiKey = (): string => {
   // هام جداً: لحل مشكلة التطبيق على الأندرويد
   // تم وضع مفتاح API الخاص بك هنا مباشرة لضمان التشغيل المستقر
   // ------------------------------------------------------------------
-  const MANUALLY_PASTED_KEY = "AIzaSyDQUacWkmLFMgR-B85aMT_9IPRArN-Oy_o" as string; // <--- تم تحديث المفتاح بنجاح
+  const MANUALLY_PASTED_KEY = "AIzaSyARttimsWzeSlv3PprpFDgwrg7KpOlxiqQ" as string; // <--- تم تحديث المفتاح بنجاح
 
   // 1. Priority: Manual Key (Fixes Android Issue)
   if (MANUALLY_PASTED_KEY && MANUALLY_PASTED_KEY.trim() !== "") {
@@ -66,7 +66,7 @@ export const analyzeMedicalImage = async (base64Image: string, mimeType: string,
   // Initialize the client strictly when needed
   const ai = new GoogleGenAI({ apiKey: apiKey });
 
-  const modelId = "gemini-2.5-flash"; // Capable of multimodal analysis
+  const modelId = "gemini-3-flash-preview"; // Using the latest recommended flash model
 
   const systemInstruction = `
     أنت خبير في الأشعة الطبية (Radiologist) والذكاء الاصطناعي الطبي. 
@@ -105,10 +105,8 @@ export const analyzeMedicalImage = async (base64Image: string, mimeType: string,
       config: {
         systemInstruction: systemInstruction,
         responseMimeType: "application/json",
-        temperature: options?.temperature ?? 0.5, // Default to 0.5 if not provided
+        temperature: options?.temperature ?? 0.5,
         maxOutputTokens: options?.maxOutputTokens,
-        // Set thinkingBudget if maxOutputTokens is set to comply with guidelines for 2.5 models. 
-        // 0 disables thinking, ensuring tokens are available for the final response.
         thinkingConfig: options?.maxOutputTokens ? { thinkingBudget: 0 } : undefined,
         responseSchema: {
           type: Type.OBJECT,
@@ -146,7 +144,6 @@ export const analyzeMedicalImage = async (base64Image: string, mimeType: string,
 
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    // If the error comes from the SDK (like 400 or 403), usually it has a message
     if (error instanceof Error) {
         throw new Error(`فشل التحليل: ${error.message}`);
     }
