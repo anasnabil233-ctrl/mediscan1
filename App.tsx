@@ -17,14 +17,16 @@ import ProfilePage from './components/ProfilePage';
 import SpecialtiesPage from './components/SpecialtiesPage';
 import DatabasePage from './components/DatabasePage';
 import HomePage from './components/HomePage';
-import FeaturesPage from './components/FeaturesPage'; // New Import
+import FeaturesPage from './components/FeaturesPage';
+import LandingPage from './components/LandingPage'; // New Import
 import ChatWidget from './components/ChatWidget';
 import { Activity, HeartPulse, WifiOff, RefreshCw, Database, Cloud } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 
 const App: React.FC = () => {
-  // Auth State
+  // Auth & View State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showLogin, setShowLogin] = useState(false); // New state to toggle login view
   const [patientsList, setPatientsList] = useState<User[]>([]);
 
   // Navigation State
@@ -197,6 +199,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('mediscan_user');
     setCurrentUser(null);
+    setShowLogin(false); // Return to landing page
     handleReset();
     setHistoryRecords([]);
     setPatientsList([]);
@@ -310,8 +313,20 @@ const App: React.FC = () => {
      );
   }
 
+  // If not logged in, show Landing Page or Login Page
   if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} />;
+    if (showLogin) {
+      return <LoginPage onLogin={handleLogin} />;
+    }
+    return (
+      <LandingPage 
+        onLoginClick={() => setShowLogin(true)} 
+        onExploreFeatures={() => {
+          // You could scroll or just show login
+          setShowLogin(true);
+        }}
+      />
+    );
   }
 
   return (
