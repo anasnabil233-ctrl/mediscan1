@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { fileToGenerativePart, analyzeMedicalImage } from './services/geminiService';
 import { saveRecord, loadHistory, deleteRecord, syncPendingRecords, syncAllData } from './services/storageService';
@@ -16,6 +17,7 @@ import ProfilePage from './components/ProfilePage';
 import SpecialtiesPage from './components/SpecialtiesPage';
 import DatabasePage from './components/DatabasePage';
 import HomePage from './components/HomePage';
+import FeaturesPage from './components/FeaturesPage'; // New Import
 import ChatWidget from './components/ChatWidget';
 import { Activity, HeartPulse, WifiOff, RefreshCw, Database, Cloud } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -26,7 +28,7 @@ const App: React.FC = () => {
   const [patientsList, setPatientsList] = useState<User[]>([]);
 
   // Navigation State
-  const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users' | 'profile' | 'specialties' | 'database'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users' | 'profile' | 'specialties' | 'database' | 'features'>('home');
 
   // App State (Dashboard)
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -46,14 +48,13 @@ const App: React.FC = () => {
   // Network State
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true); // New state for blocking load
+  const [isInitializing, setIsInitializing] = useState(true); 
   const [dbConnected, setDbConnected] = useState(false);
 
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
-    // Hardware Back Button Handler for Android
     CapacitorApp.addListener('backButton', ({ canGoBack }) => {
         if (historyOpen) {
             setHistoryOpen(false);
@@ -66,10 +67,8 @@ const App: React.FC = () => {
         }
     });
 
-    // Network Listeners
     const handleOnline = () => {
       setIsOnline(true);
-      // Auto-sync when coming back online
       handleSync();
     };
     const handleOffline = () => setIsOnline(false);
@@ -77,7 +76,6 @@ const App: React.FC = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // PWA Install Prompt Listener
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -85,45 +83,26 @@ const App: React.FC = () => {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Initial Database Connection & Sync (Auto-Connect Logic)
     const initializeApp = async () => {
        setIsInitializing(true);
        
-       // 1. If Online: Force a Full Sync first (Clear Cache & Get Fresh Data)
        if (navigator.onLine) {
-           console.log("App opened Online: Force syncing from Cloud...");
            setIsSyncing(true);
            try {
-             // Verify Connection
              const isConnected = await checkConnection();
              setDbConnected(isConnected);
-             
-             // Full Sync (This clears local DB and refills from Supabase)
              await syncAllData();
-             
-             // Refresh Users in memory from the fresh DB
              const freshUsers = await refreshLocalUsersFromDB();
-             
-             // IMPORTANT: Refresh Current Session User
-             // If the user's data changed on server (e.g. role change), update the session.
-             // If the user was deleted on server, logout.
              const storedUserJson = localStorage.getItem('mediscan_user');
              if (storedUserJson) {
                  const storedUser = JSON.parse(storedUserJson);
                  const freshUser = freshUsers.find(u => u.id === storedUser.id);
-                 
                  if (freshUser) {
-                     // Update session with fresh data
-                     console.log("Updating current session with fresh data");
                      localStorage.setItem('mediscan_user', JSON.stringify(freshUser));
                  } else {
-                     // User no longer exists in fresh data
-                     console.warn("User no longer exists in DB. Logging out.");
                      localStorage.removeItem('mediscan_user');
                  }
              }
-             
-             console.log("Initial Cloud Sync Complete & Cache Refreshed.");
            } catch(e) {
              console.error("Initial sync failed:", e);
            } finally {
@@ -131,13 +110,10 @@ const App: React.FC = () => {
            }
        }
 
-       // 2. Load User and Data (From the now fresh Local DB/Storage)
        const storedUser = localStorage.getItem('mediscan_user');
-       
        if (storedUser) {
           const userObj = JSON.parse(storedUser);
           setCurrentUser(userObj);
-          
           await loadAndFilterHistory(userObj);
           if (userObj.role === 'Admin' || userObj.role === 'Doctor' || userObj.role === 'Supervisor') {
             setPatientsList(getPatients());
@@ -155,21 +131,16 @@ const App: React.FC = () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       CapacitorApp.removeAllListeners();
     };
-  }, []); // Empty dependency array = runs once on mount
+  }, []);
 
-  // Manual Trigger or Re-sync
   const handleSync = async () => {
     setIsSyncing(true);
     try {
       await syncAllData(); 
-      await refreshLocalUsersFromDB(); // Ensure users are updated
-      
-      // Also refresh current user if they are logged in
+      await refreshLocalUsersFromDB(); 
       const storedUserJson = localStorage.getItem('mediscan_user');
       if (storedUserJson) {
           const storedUser = JSON.parse(storedUserJson);
-          const freshUsers = getPatients(); // or getUsers, but we need full list. 
-          // Re-fetching full list just to be safe
           const allUsers = await refreshLocalUsersFromDB(); 
           const freshUser = allUsers.find(u => u.id === storedUser.id);
           if (freshUser) {
@@ -177,7 +148,6 @@ const App: React.FC = () => {
               localStorage.setItem('mediscan_user', JSON.stringify(freshUser));
           }
       }
-
       if (currentUser) {
         await loadAndFilterHistory(currentUser); 
         if (currentUser.role === 'Admin' || currentUser.role === 'Doctor') {
@@ -195,9 +165,6 @@ const App: React.FC = () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted the A2HS prompt');
-        }
         setDeferredPrompt(null);
       });
     }
@@ -223,16 +190,8 @@ const App: React.FC = () => {
     localStorage.setItem('mediscan_user', JSON.stringify(user));
     setCurrentUser(user);
     loadAndFilterHistory(user);
-    
-    // Force sync on login again to be sure
     handleSync(); 
-    
-    if (user.role === 'Admin' || user.role === 'Doctor' || user.role === 'Supervisor') {
-      setPatientsList(getPatients());
-      setCurrentView('home');
-    } else {
-        setCurrentView('home'); 
-    }
+    setCurrentView('home');
   };
 
   const handleLogout = () => {
@@ -252,23 +211,9 @@ const App: React.FC = () => {
 
   const handleFileSelect = async (file: File, category: string, scanDate: string | undefined, options: AnalysisOptions) => {
     if (!isOnline) {
-      alert("عذراً، يجب أن تكون متصلاً بالإنترنت لتحليل صور جديدة. يمكنك تصفح السجل أثناء وضع عدم الاتصال.");
+      alert("عذراً، يجب أن تكون متصلاً بالإنترنت لتحليل صور جديدة.");
       return;
     }
-
-    if (scanDate) {
-      const date = new Date(scanDate);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - date.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      
-      if (diffDays > 180) {
-        if (!window.confirm("تنبيه: تاريخ الأشعة المدخل قديم (أكثر من 6 أشهر). قد لا تعكس الأشعة الحالة الصحية الحالية بدقة. هل أنت متأكد من رغبتك في المتابعة؟")) {
-          return;
-        }
-      }
-    }
-
     try {
       setAppState(AppState.ANALYZING);
       setError(null);
@@ -276,24 +221,14 @@ const App: React.FC = () => {
       setCurrentRecordId(null);
       setCurrentCategory(category);
       setCurrentView('dashboard');
-
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
-
       const base64Data = await fileToGenerativePart(file);
       setCurrentBase64(base64Data);
-      
       const analysisResult = await analyzeMedicalImage(base64Data, file.type, options);
-      
       setResult(analysisResult);
       setAppState(AppState.SUCCESS);
-      
-      if (currentUser?.role === 'Admin' || currentUser?.role === 'Doctor' || currentUser?.role === 'Supervisor') {
-        setPatientsList(getPatients());
-      }
-      
     } catch (err: any) {
-      console.error(err);
       setError(err.message || "حدث خطأ غير متوقع أثناء تحليل الصورة.");
       setAppState(AppState.ERROR);
     }
@@ -302,15 +237,12 @@ const App: React.FC = () => {
   const handleSaveResult = async (targetPatientId?: string) => {
     if (result && currentBase64 && currentUser && !isSaving) {
       setIsSaving(true);
-      
       const recordOwnerId = targetPatientId || currentUser.id;
-      
       let patientName = currentUser.name;
       if (targetPatientId) {
         const targetPatient = patientsList.find(p => p.id === targetPatientId);
         if (targetPatient) patientName = targetPatient.name;
       }
-
       const newRecord: SavedRecord = {
         id: crypto.randomUUID(),
         timestamp: Date.now(),
@@ -320,17 +252,12 @@ const App: React.FC = () => {
         patientName: patientName,
         category: currentCategory
       };
-      
       const success = await saveRecord(newRecord);
       setIsSaving(false);
-      
       if (success) {
         loadAndFilterHistory(currentUser); 
         setCurrentRecordId(newRecord.id); 
         return true;
-      } else {
-        alert("لم نتمكن من الحفظ. حدث خطأ في قاعدة البيانات.");
-        return false;
       }
     }
     return false;
@@ -343,19 +270,13 @@ const App: React.FC = () => {
     setCurrentRecordId(record.id);
     setAppState(AppState.SUCCESS);
     setHistoryOpen(false);
-    
-    if (currentUser?.role !== 'Patient') {
-        setCurrentView('dashboard');
-    }
+    setCurrentView('dashboard');
   };
 
   const handleDeleteHistoryItem = async (id: string) => {
     await deleteRecord(id);
     if (currentUser) loadAndFilterHistory(currentUser);
-    
-    if (currentRecordId === id) {
-      setCurrentRecordId(null);
-    }
+    if (currentRecordId === id) setCurrentRecordId(null);
   };
 
   const handleReset = () => {
@@ -368,7 +289,6 @@ const App: React.FC = () => {
     setCurrentCategory('');
   };
 
-  // Helper to check permission
   const hasPermission = (permission: string) => {
     if (!currentUser) return false;
     if (currentUser.role === 'Admin') return true;
@@ -376,7 +296,6 @@ const App: React.FC = () => {
     return false;
   };
 
-  // BLOCKING LOADING SCREEN
   if (isInitializing) {
      return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4" dir="rtl">
@@ -387,7 +306,6 @@ const App: React.FC = () => {
               </div>
            </div>
            <h2 className="text-lg font-bold text-slate-800">جاري تحميل البيانات...</h2>
-           <p className="text-sm text-slate-500">يتم مزامنة البيانات من السحابة لضمان دقة المعلومات</p>
         </div>
      );
   }
@@ -398,7 +316,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col font-sans pb-16 md:pb-0">
-      {/* Network Status Bar */}
       {!isOnline && (
         <div className="bg-slate-800 text-white text-xs py-1 text-center flex items-center justify-center gap-2 sticky top-0 z-[60]">
           <WifiOff size={14} />
@@ -424,152 +341,78 @@ const App: React.FC = () => {
       />
 
       <main className="flex-grow">
-        
-        {/* VIEW: Home */}
         {currentView === 'home' && (
           <HomePage 
-            onStart={() => setCurrentView('dashboard')} 
+            onStart={() => setCurrentView('features')} 
             userRole={currentUser.role} 
           />
         )}
+        
+        {currentView === 'features' && (
+          <FeaturesPage 
+            onStart={() => setCurrentView('dashboard')} 
+            isLoggedIn={!!currentUser} 
+          />
+        )}
 
-        {/* VIEW: Profile */}
         {currentView === 'profile' && (
             <div className="p-4 md:p-8">
               <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateCurrentUser} />
             </div>
         )}
 
-        {/* VIEW: Specialties */}
         {currentView === 'specialties' && (
             <div className="p-4 md:p-8">
                <SpecialtiesPage currentUser={currentUser} />
             </div>
         )}
 
-        {/* VIEW: Database Management (Admin Or Supervisor with Permission) */}
         {currentView === 'database' && hasPermission('manage_database') && (
            <div className="p-4 md:p-8">
               <DatabasePage />
            </div>
         )}
 
-        {/* VIEW: Users (Admin Or Doctor Or Supervisor with Permission) */}
         {currentView === 'users' && (currentUser.role === 'Admin' || currentUser.role === 'Doctor' || hasPermission('manage_users')) && (
           <div className="p-4 md:p-8">
              <UsersPage currentUser={currentUser} />
           </div>
         )}
 
-        {/* VIEW: Dashboard (Main) */}
         {currentView === 'dashboard' && (
             <div className="p-4 md:p-8">
-                {/* Patient Welcome Screen */}
-                {currentUser.role === 'Patient' && appState === AppState.IDLE && (
-                <div className="max-w-2xl mx-auto text-center py-12 animate-fade-in-up">
-                    <div className="bg-teal-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <HeartPulse className="text-teal-600" size={48} />
-                    </div>
-                    <h2 className="text-3xl font-bold text-slate-800 mb-4">أهلاً بك، {currentUser.name}</h2>
-                    <p className="text-slate-600 mb-8">
-                    يمكنك استعراض تاريخ فحوصاتك الطبية وتقارير الأشعة الخاصة بك.
-                    </p>
-                    <button 
-                    onClick={() => setHistoryOpen(true)}
-                    className="bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-500/30"
-                    >
-                    عرض سجل الفحوصات
-                    </button>
-                </div>
-                )}
-
-                {/* Dashboard / Main View */}
                 {(currentUser.role !== 'Patient' || appState === AppState.SUCCESS) && (
                     <div className="max-w-7xl mx-auto w-full">
-                    
-                    {currentUser.role !== 'Patient' && (
-                        <div className="text-center mb-10 space-y-2 hidden md:block">
-                            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">
-                            تحليل الصور الطبية بالذكاء الاصطناعي
-                            </h2>
-                            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-                            قم برفع صور الأشعة للحصول على تشخيص فوري.
-                            </p>
-                        </div>
-                    )}
-
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                        
-                        {/* Left Column: Input Area */}
                         {currentUser.role !== 'Patient' && (
                         <div className={`lg:col-span-5 space-y-6 ${appState === AppState.SUCCESS ? 'lg:sticky lg:top-24' : 'mx-auto w-full max-w-2xl lg:col-span-12'}`}>
-                        
                         <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200">
                             {previewUrl ? (
                             <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-black aspect-[4/3] flex items-center justify-center group">
-                                <img 
-                                src={previewUrl} 
-                                alt="Uploaded X-ray" 
-                                className="max-h-full max-w-full object-contain" 
-                                />
+                                <img src={previewUrl} alt="Scan" className="max-h-full max-w-full object-contain" />
                                 {appState !== AppState.ANALYZING && (
-                                <button 
-                                    onClick={handleReset}
-                                    className="absolute bottom-4 right-4 bg-white/90 hover:bg-white text-slate-800 px-4 py-2 rounded-lg shadow-lg text-sm font-bold flex items-center gap-2 transition-all"
-                                >
-                                    <RefreshCw size={16} />
-                                    تحليل صورة جديدة
+                                <button onClick={handleReset} className="absolute bottom-4 right-4 bg-white/90 text-slate-800 px-4 py-2 rounded-lg shadow-lg text-sm font-bold flex items-center gap-2">
+                                    <RefreshCw size={16} /> تحليل صورة جديدة
                                 </button>
                                 )}
                             </div>
                             ) : (
                             <FileUpload onFileSelect={handleFileSelect} disabled={appState === AppState.ANALYZING || !isOnline} />
                             )}
-
                             {appState === AppState.ANALYZING && (
                             <div className="mt-6 text-center py-8">
-                                <div className="relative inline-flex mb-4">
-                                <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-500 rounded-full animate-spin"></div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <Activity className="text-teal-500 animate-pulse" size={24} />
-                                </div>
-                                </div>
-                                <h3 className="text-lg font-bold text-slate-800 animate-pulse">جاري تحليل الصورة...</h3>
-                            </div>
-                            )}
-
-                            {appState === AppState.ERROR && (
-                            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
-                                <p className="text-red-600 font-medium mb-2">عذراً، حدث خطأ</p>
-                                <p className="text-sm text-red-500 mb-4">{error}</p>
-                                <button 
-                                    onClick={handleReset}
-                                    className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-bold hover:bg-red-200 transition-colors"
-                                >
-                                    حاول مرة أخرى
-                                </button>
+                                <div className="w-16 h-16 border-4 border-teal-200 border-t-teal-500 rounded-full animate-spin mx-auto mb-4"></div>
+                                <h3 className="text-lg font-bold text-slate-800">جاري تحليل الصورة...</h3>
                             </div>
                             )}
                         </div>
                         </div>
                         )}
-
-                        {/* Right Column: Results */}
                         {appState === AppState.SUCCESS && result && (
                         <div className={`${currentUser.role === 'Patient' ? 'lg:col-span-12 max-w-4xl mx-auto' : 'lg:col-span-7'} w-full`}>
-                            
-                            {currentUser.role === 'Patient' && previewUrl && (
-                                <div className="mb-6 bg-black rounded-xl overflow-hidden h-64 md:h-96 flex items-center justify-center border border-slate-200 shadow-sm">
-                                    <img src={previewUrl} alt="Scan" className="max-h-full max-w-full object-contain" />
-                                </div>
-                            )}
-
                             <ResultsView 
                             result={result} 
-                            onSave={(target) => {
-                                handleSaveResult(target);
-                                return true;
-                            }} 
+                            onSave={(target) => handleSaveResult(target)} 
                             isSaved={!!currentRecordId}
                             userRole={currentUser.role}
                             patients={patientsList}
@@ -583,7 +426,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Bottom Nav for Mobile */}
       <BottomNav 
         currentView={currentView}
         onNavigate={setCurrentView}
@@ -591,18 +433,8 @@ const App: React.FC = () => {
         userRole={currentUser.role}
         userPermissions={currentUser.permissions}
       />
-
-      <HistoryModal 
-        isOpen={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        records={historyRecords}
-        onSelect={handleSelectHistoryItem}
-        onDelete={handleDeleteHistoryItem}
-        currentUser={currentUser}
-      />
-
+      <HistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} records={historyRecords} onSelect={handleSelectHistoryItem} onDelete={handleDeleteHistoryItem} currentUser={currentUser} />
       {currentUser && <ChatWidget currentUser={currentUser} />}
-
       <Footer />
     </div>
   );
