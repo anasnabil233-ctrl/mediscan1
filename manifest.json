@@ -1,11 +1,12 @@
+
 {
-  "name": "MediScan AI - تحليل الأشعة",
+  "name": "MediScan AI - اسكان الأشعة",
   "short_name": "MediScan",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0d9488",
-  "description": "تطبيق ذكي لتحليل الأشعة الطبية وتشخيص الأمراض",
+  "description": "تطبيق ذكي لإسكان الصور الطبية وتشخيص الأمراض",
   "orientation": "portrait",
   "icons": [
     {

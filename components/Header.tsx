@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenHistory,
             <Logo size={36} className="shadow-sm rounded-xl" />
             <div>
               <h1 className="text-lg md:text-xl font-bold text-slate-800">MediScan AI</h1>
-              <p className="text-[10px] md:text-xs text-slate-500">تحليل الأشعة الذكي</p>
+              <p className="text-[10px] md:text-xs text-slate-500">اسكان الأشعة الذكي</p>
             </div>
           </div>
 

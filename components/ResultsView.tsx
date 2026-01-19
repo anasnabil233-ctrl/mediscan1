@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AnalysisResult, User, UserRole } from '../types';
 import { CheckCircle2, AlertCircle, FileText, ClipboardList, Activity, Save, Check, User as UserIcon, Loader2 } from 'lucide-react';
@@ -63,7 +64,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-1">تقرير التحليل</h2>
+            <h2 className="text-2xl font-bold text-slate-800 mb-1">تقرير الفحص</h2>
             <p className="text-slate-500 text-sm">تم الإنشاء بواسطة Gemini 3 AI</p>
           </div>
           
@@ -170,7 +171,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                 ))}
             </div>
             <div className="mt-6 p-4 bg-blue-50 text-blue-800 rounded-lg text-xs leading-relaxed">
-                يرجى ملاحظة أن هذه التوصيات مستمدة من تحليل الذكاء الاصطناعي ويجب مراجعتها من قبل مقدم الرعاية الصحية المختص قبل اتخاذ أي إجراء.
+                يرجى ملاحظة أن هذه التوصيات مستمدة من اسكان الذكاء الاصطناعي ويجب مراجعتها من قبل مقدم الرعاية الصحية المختص قبل اتخاذ أي إجراء.
             </div>
         </div>
       </div>

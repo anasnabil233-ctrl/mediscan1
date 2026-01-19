@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Database, Server, HardDrive, Users, RefreshCw, Cloud, Wifi, WifiOff, AlertTriangle, CheckCircle2, Download, Upload, FileJson, FileCode } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -367,7 +368,7 @@ end $$;
             <span className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">محلي (IndexedDB)</span>
           </div>
           <div className="text-3xl font-bold text-slate-800 mb-1">{stats.localRecords}</div>
-          <p className="text-sm text-slate-500">إجمالي السجلات الطبية</p>
+          <p className="text-sm text-slate-500">إجمالي سجلات الاسكان</p>
         </div>
 
         {/* Remote DB Stat */}
@@ -465,7 +466,7 @@ end $$;
                <p className="text-sm text-slate-500 mb-6">
                   تحميل نسخة كاملة (ملف JSON) تحتوي على:
                   <br />
-                  <span className="font-bold text-slate-700">- السجلات الطبية والتحاليل.</span>
+                  <span className="font-bold text-slate-700">- سجلات الاسكان والتحاليل.</span>
                   <br />
                   <span className="font-bold text-slate-700">- بيانات المستخدمين وكلمات المرور.</span>
                </p>

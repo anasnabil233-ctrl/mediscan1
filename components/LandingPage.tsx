@@ -58,11 +58,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onExploreFeatur
                 <span>مستقبل التشخيص الطبي هنا</span>
               </div>
               <h1 className="text-5xl md:text-7xl font-black text-slate-900 leading-[1.1] animate-fade-in-up">
-                حلل صور الأشعة <br />
+                اسكان صور الأشعة <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-l from-teal-600 to-blue-600">بذكاء اصطناعي فائق</span>
               </h1>
               <p className="text-lg md:text-xl text-slate-500 max-w-xl mx-auto lg:mx-0 leading-relaxed animate-fade-in-up delay-100">
-                منصة MediScan AI توفر للأطباء تحليلاً فورياً وشاملاً لصور X-Ray و MRI و CT Scan بدقة تصل إلى 99%، مع تقارير طبية مفصلة باللغة العربية.
+                منصة MediScan AI توفر للأطباء اسكاناً فورياً وشاملاً لصور X-Ray و MRI و CT Scan بدقة تصل إلى 99%، مع تقارير طبية مفصلة باللغة العربية.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 animate-fade-in-up delay-200">
                 <button 
@@ -97,7 +97,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onExploreFeatur
 
                   <div className="absolute bottom-6 left-6 right-6 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20">
                     <div className="flex items-center justify-between text-white mb-2">
-                      <span className="text-xs font-bold uppercase tracking-widest">تحليل Gemini 3</span>
+                      <span className="text-xs font-bold uppercase tracking-widest">فحص Gemini 3</span>
                       <span className="text-xs font-mono">98.4% دقة</span>
                     </div>
                     <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
@@ -118,9 +118,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onExploreFeatur
       <section className="py-20 bg-slate-900 text-white relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-12 text-center relative z-10">
           {[
-            { val: "99%", label: "دقة التشخيص", sub: "بمعايير عالمية" },
-            { val: "10s", label: "سرعة التحليل", sub: "لكل صورة أشعة" },
-            { val: "+15k", label: "فحص مكتمل", sub: "تمت بنجاح" },
+            { val: "99%", label: "دقة الفحص", sub: "بمعايير عالمية" },
+            { val: "10s", label: "سرعة الفحص", sub: "لكل صورة أشعة" },
+            { val: "+15k", label: "اسكان مكتمل", sub: "تمت بنجاح" },
             { val: "24/7", label: "دعم فني", sub: "متوفر دائماً" }
           ].map((stat, i) => (
             <div key={i} className="space-y-2">
@@ -136,14 +136,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, onExploreFeatur
       <section id="features" className="py-32 max-w-7xl mx-auto px-4">
         <div className="text-center mb-20 space-y-4">
           <h2 className="text-teal-600 font-black uppercase tracking-widest text-sm">لماذا MediScan AI؟</h2>
-          <p className="text-3xl md:text-5xl font-black text-slate-900">مميزات تجعل التشخيص أسهل</p>
+          <p className="text-3xl md:text-5xl font-black text-slate-900">مميزات تجعل الفحص أسهل</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
             { 
-              title: "تحليل ذكي فوري", 
-              desc: "باستخدام أحدث نماذج Google Gemini 3، يتم تحليل أدق التفاصيل في صور الأشعة واكتشاف الكسور والأورام والالتهابات.",
+              title: "اسكان ذكي فوري", 
+              desc: "باستخدام أحدث نماذج Google Gemini 3، يتم فحص أدق التفاصيل في صور الأشعة واكتشاف الكسور والأورام والالتهابات.",
               icon: <BrainCircuit className="text-teal-600" size={32} />,
               bg: "bg-teal-50"
             },

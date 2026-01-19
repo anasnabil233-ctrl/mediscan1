@@ -25,21 +25,21 @@ const HomePage: React.FC<HomePageProps> = ({ onStart, userRole }) => {
             <div className="sm:text-center md:max-w-2xl md:mx-auto lg:col-span-6 lg:text-right">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-sm font-bold mb-6">
                 <Zap size={16} fill="currentColor" />
-                <span>الجيل الجديد من التشخيص الطبي</span>
+                <span>الجيل الجديد من الفحص الطبي</span>
               </div>
               <h1 className="text-4xl tracking-tight font-extrabold text-slate-900 sm:text-5xl md:text-6xl lg:text-5xl xl:text-6xl">
-                <span className="block xl:inline">تحليل الأشعة الطبية</span>{' '}
+                <span className="block xl:inline">اسكان الأشعة الطبية</span>{' '}
                 <span className="block text-teal-600 xl:inline">بالذكاء الاصطناعي</span>
               </h1>
               <p className="mt-3 text-base text-slate-500 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
-                منصة MediScan AI تساعد الأطباء والمرضى في الحصول على تحليل فوري ودقيق لصور الأشعة، الرنين المغناطيسي، والأشعة المقطعية باستخدام أحدث تقنيات Gemini 2.5.
+                منصة MediScan AI تساعد الأطباء والمرضى في الحصول على اسكان فوري ودقيق لصور الأشعة، الرنين المغناطيسي، والأشعة المقطعية باستخدام أحدث تقنيات Gemini 2.5.
               </p>
               <div className="mt-8 sm:max-w-lg sm:mx-auto sm:text-center lg:text-right lg:mx-0">
                 <button
                   onClick={onStart}
                   className="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-white bg-teal-600 hover:bg-teal-700 md:text-lg shadow-lg shadow-teal-500/30 transition-all transform hover:scale-105"
                 >
-                  {userRole === 'Doctor' ? 'ابدأ الفحص الآن' : 'تحليل صور الأشعة'}
+                  {userRole === 'Doctor' ? 'ابدأ الفحص الآن' : 'اسكان صور الأشعة'}
                   <ArrowRight className="mr-2" size={24} />
                 </button>
                 <p className="mt-3 text-xs text-slate-400">
@@ -105,7 +105,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart, userRole }) => {
                 </div>
                 <h3 className="text-lg leading-6 font-bold text-slate-900">سهولة الاستخدام</h3>
                 <p className="mt-2 text-base text-slate-500">
-                  واجهة بسيطة تدعم السحب والإفلات. ارفع الصورة واحصل على النتيجة في ثوانٍ.
+                  واجهة بسيطة تدعم السحب والإفلات. ارفع الصورة واعمل اسكان في ثوانٍ.
                 </p>
               </div>
 
@@ -115,7 +115,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart, userRole }) => {
                 </div>
                 <h3 className="text-lg leading-6 font-bold text-slate-900">ذكاء اصطناعي متطور</h3>
                 <p className="mt-2 text-base text-slate-500">
-                  يعتمد على نماذج Gemini 2.5 القوية لتحليل دقيق واكتشاف الحالات المعقدة.
+                  يعتمد على نماذج Gemini 2.5 القوية لاسكان دقيق واكتشاف الحالات المعقدة.
                 </p>
               </div>
 
@@ -125,7 +125,7 @@ const HomePage: React.FC<HomePageProps> = ({ onStart, userRole }) => {
                 </div>
                 <h3 className="text-lg leading-6 font-bold text-slate-900">تقارير مفصلة</h3>
                 <p className="mt-2 text-base text-slate-500">
-                  احصل على تقرير شامل يتضمن التشخيص، نسبة الثقة، والتوصيات الطبية باللغة العربية.
+                  احصل على تقرير شامل يتضمن الفحص، نسبة الثقة، والتوصيات الطبية باللغة العربية.
                 </p>
               </div>
 
@@ -134,32 +134,34 @@ const HomePage: React.FC<HomePageProps> = ({ onStart, userRole }) => {
         </div>
       </div>
 
-      {/* Stats Section */}
-      <div className="bg-teal-800 text-white py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-teal-700 divide-x-reverse">
-                  <div>
-                      <div className="text-4xl font-bold mb-1">+1000</div>
-                      <div className="text-teal-200 text-sm">حالة تم تحليلها</div>
-                  </div>
-                  <div>
-                      <div className="text-4xl font-bold mb-1">98%</div>
-                      <div className="text-teal-200 text-sm">دقة التحليل</div>
-                  </div>
-                  <div>
-                      <div className="text-4xl font-bold mb-1">24/7</div>
-                      <div className="text-teal-200 text-sm">متاح دائماً</div>
-                  </div>
-                  <div>
-                      <div className="text-4xl font-bold mb-1"><ShieldCheck className="mx-auto" size={32} /></div>
-                      <div className="text-teal-200 text-sm">بيانات آمنة</div>
-                  </div>
-              </div>
-          </div>
-      </div>
-
+      {statsSection()}
     </div>
   );
 };
+
+const statsSection = () => (
+  <div className="bg-teal-800 text-white py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-teal-700 divide-x-reverse">
+        <div>
+          <div className="text-4xl font-bold mb-1">+1000</div>
+          <div className="text-teal-200 text-sm">حالة تم اسكانها</div>
+        </div>
+        <div>
+          <div className="text-4xl font-bold mb-1">98%</div>
+          <div className="text-teal-200 text-sm">دقة الفحص</div>
+        </div>
+        <div>
+          <div className="text-4xl font-bold mb-1">24/7</div>
+          <div className="text-teal-200 text-sm">متاح دائماً</div>
+        </div>
+        <div>
+          <div className="text-4xl font-bold mb-1"><ShieldCheck className="mx-auto" size={32} /></div>
+          <div className="text-teal-200 text-sm">بيانات آمنة</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export default HomePage;

@@ -12,7 +12,7 @@ const FeaturesPage: React.FC<FeaturesPageProps> = ({ onStart, isLoggedIn }) => {
   const features = [
     {
       title: "ذكاء اصطناعي متطور",
-      description: "يعتمد على أقوى نماذج Gemini 3 لتحليل صور الأشعة (X-ray, MRI, CT) بدقة تضاهي الخبراء.",
+      description: "يعتمد على أقوى نماذج Gemini 3 لاسكان صور الأشعة (X-ray, MRI, CT) بدقة تضاهي الخبراء.",
       icon: <BrainCircuit className="text-teal-600" size={32} />,
       bg: "bg-teal-50"
     },
@@ -24,7 +24,7 @@ const FeaturesPage: React.FC<FeaturesPageProps> = ({ onStart, isLoggedIn }) => {
     },
     {
       title: "تقارير فورية وشاملة",
-      description: "استخراج النتائج في ثوانٍ معدودة تشمل التشخيص، نسبة الثقة، والتوصيات الطبية.",
+      description: "استخراج النتائج في ثوانٍ معدودة تشمل الفحص، نسبة الثقة، والتوصيات الطبية.",
       icon: <FileCheck className="text-purple-600" size={32} />,
       bg: "bg-purple-50"
     },
@@ -62,7 +62,7 @@ const FeaturesPage: React.FC<FeaturesPageProps> = ({ onStart, isLoggedIn }) => {
               مرحباً بك في <span className="text-teal-600">MediScan AI</span>
             </h1>
             <p className="text-lg md:text-xl text-slate-600 max-w-3xl leading-relaxed mb-10">
-              المنصة الرائدة في الشرق الأوسط لتحليل الصور الطبية باستخدام الذكاء الاصطناعي، 
+              المنصة الرائدة في الشرق الأوسط لإسكان الصور الطبية باستخدام الذكاء الاصطناعي، 
               نهدف إلى تمكين الأطباء ومساعدة المرضى عبر تشخيص أسرع وأدق.
             </p>
             <button 
@@ -82,7 +82,7 @@ const FeaturesPage: React.FC<FeaturesPageProps> = ({ onStart, isLoggedIn }) => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-black text-white mb-2">99%</div>
-              <div className="text-teal-200 text-sm">دقة التحليل</div>
+              <div className="text-teal-200 text-sm">دقة الفحص</div>
             </div>
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-black text-white mb-2">24/7</div>
@@ -90,7 +90,7 @@ const FeaturesPage: React.FC<FeaturesPageProps> = ({ onStart, isLoggedIn }) => {
             </div>
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-black text-white mb-2">+10k</div>
-              <div className="text-teal-200 text-sm">صورة تم تحليلها</div>
+              <div className="text-teal-200 text-sm">صورة تم اسكانها</div>
             </div>
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-black text-white mb-2">10s</div>
@@ -138,7 +138,7 @@ const FeaturesPage: React.FC<FeaturesPageProps> = ({ onStart, isLoggedIn }) => {
             
             {[
               { step: "01", title: "رفع الصورة", desc: "قم برفع صورة الأشعة من جهازك أو التقاطها مباشرة.", icon: <Zap className="text-white" /> },
-              { step: "02", title: "تحليل الذكاء الاصطناعي", desc: "يقوم النظام بفحص كل بكسل في الصورة لتحديد العلامات المرضية.", icon: <Microscope className="text-white" /> },
+              { step: "02", title: "اسكان الذكاء الاصطناعي", desc: "يقوم النظام بفحص كل بكسل في الصورة لتحديد العلامات المرضية.", icon: <Microscope className="text-white" /> },
               { step: "03", title: "استلام التقرير", desc: "احصل على تقرير طبي مفصل باللغة العربية مع إمكانية حفظه.", icon: <Activity className="text-white" /> }
             ].map((item, idx) => (
               <div key={idx} className="relative z-10 flex flex-col items-center text-center">
