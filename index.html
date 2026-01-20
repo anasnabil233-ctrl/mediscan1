@@ -51,11 +51,11 @@
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
+    "@capacitor/app": "https://esm.sh/@capacitor/app@^8.0.0",
+    "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.0.1",
     "vite": "https://esm.sh/vite@^7.3.1",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "path": "https://esm.sh/path@^0.12.7",
-    "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.0.1",
-    "@capacitor/app": "https://esm.sh/@capacitor/app@^8.0.0"
+    "path": "https://esm.sh/path@^0.12.7"
   }
 }
 </script>
@@ -64,9 +64,10 @@
       // تهيئة كائن process لضمان التوافق مع المكتبات
       window.process = window.process || { env: {} };
       
-      // التعديل: لا تقم بتصفير المفتاح إذا كان Vite قد قام بحقنه بالفعل
-      if (typeof process.env.API_KEY === 'undefined') {
-        process.env.API_KEY = ''; 
+      // التعديل: لا تقم بتعيين قيمة فارغة إذا كان المفتاح موجوداً بالفعل (محقوناً)
+      if (typeof process.env.API_KEY === 'undefined' || process.env.API_KEY === '') {
+        // سيتم استبدال هذه القيمة أثناء الـ Build إذا تم ضبط Vite بشكل صحيح
+        // وإلا ستبقى فارغة ليظهر الخطأ للمستخدم
       }
     </script>
   </head>
