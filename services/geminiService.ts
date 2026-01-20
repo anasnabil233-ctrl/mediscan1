@@ -16,10 +16,12 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
 };
 
 export const analyzeMedicalImage = async (base64Image: string, mimeType: string, options?: AnalysisOptions): Promise<AnalysisResult> => {
-  const apiKey = process.env.API_KEY;
+  // محاولة جلب المفتاح من عدة مصادر محتملة (حقن Vite)
+  const apiKey = (process.env.API_KEY) || (import.meta as any).env?.VITE_API_KEY;
 
   if (!apiKey || apiKey === '') {
-    throw new Error("مفتاح API الخاص بـ Gemini غير موجود. يرجى التأكد من إضافة API_KEY في إعدادات Vercel وإعادة النشر.");
+    console.error("Critical: API_KEY is missing from both process.env and import.meta.env");
+    throw new Error("مفتاح API غير متوفر في هذه النسخة. يرجى التأكد من إضافة VITE_API_KEY في إعدادات Vercel ثم الضغط على Redeploy.");
   }
 
   const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -77,23 +79,17 @@ export const analyzeMedicalImage = async (base64Image: string, mimeType: string,
     });
 
     const text = response.text;
-    if (!text) {
-      throw new Error("استجابة النموذج فارغة.");
-    }
+    if (!text) throw new Error("استجابة النموذج فارغة.");
 
     return JSON.parse(text) as AnalysisResult;
 
   } catch (error: any) {
-    console.error("Gemini Analysis Error:", error);
+    console.error("Gemini Analysis Error Detail:", error);
     
-    // معالجة خطأ الحصص أو المفتاح غير الصحيح
     if (error.message?.includes('403') || error.message?.includes('API key')) {
-        throw new Error("مفتاح API غير صالح أو لا يملك الصلاحيات الكافية. تأكد من استخدام مفتاح من مشروع مدفوع أو مفتاح صالح من AI Studio.");
+        throw new Error("خطأ في صلاحية المفتاح (403). تأكد أن المفتاح يعمل في مشروع مدفوع أو أنه تم إنشاؤه بشكل صحيح من Google AI Studio.");
     }
     
-    if (error instanceof Error) {
-        throw new Error(`فشل التحليل: ${error.message}`);
-    }
-    throw new Error("حدث خطأ غير متوقع أثناء تحليل الصورة.");
+    throw new Error(error.message || "حدث خطأ غير متوقع أثناء تحليل الصورة.");
   }
 };
