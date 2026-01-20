@@ -180,8 +180,9 @@ const App: React.FC = () => {
                 <p className="text-slate-500">ارفع صورة الأشعة الخاصة بك للحصول على تحليل فوري مدعوم بالذكاء الاصطناعي</p>
               </div>
 
+              {/* FIXED: Removed Redundant comparison causing TS2367 Error */}
               {appState === AppState.IDLE && (
-                <FileUpload onFileSelect={handleFileSelect} disabled={appState === AppState.ANALYZING} />
+                <FileUpload onFileSelect={handleFileSelect} disabled={false} />
               )}
 
               {appState === AppState.ANALYZING && (
