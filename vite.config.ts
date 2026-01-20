@@ -5,10 +5,11 @@ import { resolve } from 'path';
 
 export default defineConfig(({ mode }) => {
   // تحميل متغيرات البيئة من النظام (Vercel) أو ملف .env
-  const env = loadEnv(mode, (process as any).cwd(), '');
+  // استخدام '' كبادئة يسمح بتحميل المتغيرات التي لا تبدأ بـ VITE_ في بيئة الـ Build
+  const env = loadEnv(mode, process.cwd(), '');
   
-  // دمج المتغيرات التي قد تكون باسم API_KEY أو VITE_API_KEY من النظام مباشرة
-  const actualApiKey = env.VITE_API_KEY || env.API_KEY || (process as any).env.VITE_API_KEY || (process as any).env.API_KEY || '';
+  // تحديد المفتاح النهائي
+  const actualApiKey = env.VITE_API_KEY || env.API_KEY || process.env.VITE_API_KEY || process.env.API_KEY || '';
 
   return {
     plugins: [
@@ -16,7 +17,8 @@ export default defineConfig(({ mode }) => {
     ],
     base: './',
     define: {
-      // حقن المتغيرات بشكل مباشر ليتم استبدالها في كود المتصفح أثناء البناء
+      // حقن المتغيرات بشكل مباشر ليتم استبدالها في كود المتصفح أثناء البناء (Build)
+      // ملاحظة: Vite يستبدل هذه السلاسل حرفياً في ملفات الـ JS الناتجة
       'process.env.API_KEY': JSON.stringify(actualApiKey),
       'process.env.VITE_API_KEY': JSON.stringify(actualApiKey),
       'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
@@ -28,7 +30,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       rollupOptions: {
           input: {
-              main: resolve((process as any).cwd(), 'index.html'),
+              main: resolve(process.cwd(), 'index.html'),
           }
       }
     },
