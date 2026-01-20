@@ -16,24 +16,21 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
 };
 
 export const analyzeMedicalImage = async (base64Image: string, mimeType: string, options?: AnalysisOptions): Promise<AnalysisResult> => {
-  // محاولة جلب المفتاح بأكثر من طريقة لضمان التوافق مع Vercel
-  const apiKey = (process.env.VITE_API_KEY) || (process.env.API_KEY) || (import.meta as any).env?.VITE_API_KEY;
+  const apiKey = process.env.API_KEY;
 
-  if (!apiKey || apiKey.trim() === '') {
-    console.error("CRITICAL ERROR: API_KEY is missing in the production environment.");
-    throw new Error("مفتاح API الخاص بـ Gemini مفقود. يرجى التأكد من إضافة VITE_API_KEY في Vercel Environment Variables ثم عمل Redeploy.");
+  if (!apiKey) {
+    throw new Error("مفتاح API غير متوفر. يرجى التأكد من إعدادات النظام.");
   }
 
-  // تهيئة العميل في كل مرة لضمان استخدام أحدث مفتاح محقون
-  const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+  const ai = new GoogleGenAI({ apiKey });
   
-  // استخدام موديل Gemini 3 Pro للمهام الطبية المعقدة
+  // نستخدم Gemini 3 Pro للتحليل الدقيق، ولكن سنقوم بمعالجة أخطاء الضغط
   const modelId = 'gemini-3-pro-preview';
 
   const systemInstruction = `أنت خبير استشاري في الأشعة الطبية (Radiologist). 
-مهمتك هي تحليل الصور الطبية المرفقة (X-ray, MRI, CT) بدقة علمية عالية.
-قدم تقريراً طبياً باللغة العربية يشرح الملاحظات المرئية والتشخيص المحتمل.
-يجب أن تكون موضوعياً وتذكر دائماً أن هذا التحليل هو استرشادي مدعوم بالذكاء الاصطناعي ويجب مراجعته من طبيب مختص.`;
+مهمتك هي تحليل الصور الطبية المرفقة بدقة علمية عالية.
+قدم تقريراً طبياً باللغة العربية يشرح الملاحظات والتشخيص المحتمل.
+يجب ذكر أن هذا التحليل استرشادي ويجب مراجعته من طبيب مختص.`;
 
   const prompt = `حلل هذه الصورة الطبية بدقة واستخرج النتائج بالتنسيق المطلوب (JSON). تأكد من كتابة كل شيء باللغة العربية.`;
 
@@ -83,30 +80,27 @@ export const analyzeMedicalImage = async (base64Image: string, mimeType: string,
 
     const resultText = response.text;
     if (!resultText) {
-      throw new Error("استلم التطبيق استجابة فارغة من خادم الذكاء الاصطناعي.");
+      throw new Error("استلم التطبيق استجابة فارغة.");
     }
 
-    try {
-      return JSON.parse(resultText) as AnalysisResult;
-    } catch (parseError) {
-      console.error("JSON Parse Error:", resultText);
-      throw new Error("فشل معالجة البيانات المستلمة. يرجى المحاولة مرة أخرى.");
-    }
+    return JSON.parse(resultText) as AnalysisResult;
 
   } catch (error: any) {
-    console.error("Detailed Gemini Analysis Error:", error);
+    console.error("Gemini Error:", error);
     
-    // معالجة الأخطاء الشائعة لإظهار رسائل مفهومة للمستخدم
-    if (error.message?.includes('403')) {
-        throw new Error("خطأ 403: يبدو أن المفتاح المستخدم لا يملك صلاحية الوصول لهذا الموديل أو أن المنطقة الجغرافية غير مدعومة.");
-    }
-    if (error.message?.includes('404')) {
-        throw new Error("خطأ 404: الموديل المحدد (gemini-3-pro-preview) غير متوفر حالياً لحسابك. يرجى التحقق من لوحة تحكم Google AI Studio.");
-    }
-    if (error.message?.includes('API key')) {
-        throw new Error("خطأ في صلاحية المفتاح. تأكد من صحة VITE_API_KEY في إعدادات Vercel.");
-    }
+    // فك تشفير رسائل الخطأ من جوجل لإظهار رسالة نظيفة
+    let errorMessage = error.message || "";
     
-    throw new Error(error.message || "حدث خطأ غير متوقع أثناء تحليل الصورة.");
+    // إذا كان الخطأ بصيغة JSON (كما في الصورة)، نحاول استخراج الرسالة الأساسية
+    if (errorMessage.startsWith('{') || errorMessage.includes('quota')) {
+       if (errorMessage.includes('429') || errorMessage.includes('QUOTA_EXHAUSTED')) {
+         throw new Error("عذراً، لقد تجاوزت الحد المسموح به من المحاولات المجانية لهذا اليوم. يرجى الانتظار قليلاً أو المحاولة غداً، أو استخدام مفتاح API مدفوع.");
+       }
+       if (errorMessage.includes('500') || errorMessage.includes('503')) {
+         throw new Error("خادم الذكاء الاصطناعي مشغول حالياً. يرجى المحاولة مرة أخرى بعد ثوانٍ.");
+       }
+    }
+
+    throw new Error(errorMessage.length > 100 ? "حدث خطأ في الاتصال بخادم التحليل. يرجى التأكد من جودة الصورة والمحاولة لاحقاً." : errorMessage);
   }
 };
