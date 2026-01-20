@@ -18,15 +18,15 @@ import SpecialtiesPage from './components/SpecialtiesPage';
 import DatabasePage from './components/DatabasePage';
 import HomePage from './components/HomePage';
 import FeaturesPage from './components/FeaturesPage';
-import LandingPage from './components/LandingPage'; // New Import
+import LandingPage from './components/LandingPage';
 import ChatWidget from './components/ChatWidget';
-import { Activity, HeartPulse, WifiOff, RefreshCw, Database, Cloud } from 'lucide-react';
+import { Activity, HeartPulse, WifiOff, RefreshCw, Database, Cloud, AlertCircle, RefreshCcw } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 
 const App: React.FC = () => {
   // Auth & View State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showLogin, setShowLogin] = useState(false); // New state to toggle login view
+  const [showLogin, setShowLogin] = useState(false); 
   const [patientsList, setPatientsList] = useState<User[]>([]);
 
   // Navigation State
@@ -199,7 +199,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('mediscan_user');
     setCurrentUser(null);
-    setShowLogin(false); // Return to landing page
+    setShowLogin(false); 
     handleReset();
     setHistoryRecords([]);
     setPatientsList([]);
@@ -313,7 +313,6 @@ const App: React.FC = () => {
      );
   }
 
-  // If not logged in, show Landing Page or Login Page
   if (!currentUser) {
     if (showLogin) {
       return <LoginPage onLogin={handleLogin} />;
@@ -322,7 +321,6 @@ const App: React.FC = () => {
       <LandingPage 
         onLoginClick={() => setShowLogin(true)} 
         onExploreFeatures={() => {
-          // You could scroll or just show login
           setShowLogin(true);
         }}
       />
@@ -396,7 +394,7 @@ const App: React.FC = () => {
 
         {currentView === 'dashboard' && (
             <div className="p-4 md:p-8">
-                {(currentUser.role !== 'Patient' || appState === AppState.SUCCESS) && (
+                {(currentUser.role !== 'Patient' || appState === AppState.SUCCESS || appState === AppState.ERROR) && (
                     <div className="max-w-7xl mx-auto w-full">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         {currentUser.role !== 'Patient' && (
@@ -423,17 +421,40 @@ const App: React.FC = () => {
                         </div>
                         </div>
                         )}
-                        {appState === AppState.SUCCESS && result && (
+                        
                         <div className={`${currentUser.role === 'Patient' ? 'lg:col-span-12 max-w-4xl mx-auto' : 'lg:col-span-7'} w-full`}>
-                            <ResultsView 
-                            result={result} 
-                            onSave={(target) => handleSaveResult(target)} 
-                            isSaved={!!currentRecordId}
-                            userRole={currentUser.role}
-                            patients={patientsList}
-                            />
+                            {appState === AppState.ERROR && error && (
+                                <div className="bg-red-50 border border-red-200 text-red-700 p-8 rounded-2xl mb-8 flex flex-col items-center gap-4 text-center animate-fade-in-up">
+                                    <AlertCircle size={48} className="text-red-500" />
+                                    <div>
+                                        <h3 className="font-bold text-xl mb-2">فشل تحليل الصورة</h3>
+                                        <p className="text-sm opacity-90 leading-relaxed max-w-md mx-auto">{error}</p>
+                                    </div>
+                                    <div className="flex gap-4 mt-2">
+                                        <button 
+                                            onClick={handleReset} 
+                                            className="bg-white border border-red-200 px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors flex items-center gap-2"
+                                        >
+                                            <RefreshCcw size={18} />
+                                            إعادة المحاولة
+                                        </button>
+                                    </div>
+                                    <div className="mt-4 p-4 bg-white/50 rounded-xl border border-red-100 text-[10px] text-red-400">
+                                        تلميح: تأكد من ضبط VITE_API_KEY في إعدادات Vercel وإعادة عمل Deploy.
+                                    </div>
+                                </div>
+                            )}
+
+                            {appState === AppState.SUCCESS && result && (
+                                <ResultsView 
+                                result={result} 
+                                onSave={(target) => handleSaveResult(target)} 
+                                isSaved={!!currentRecordId}
+                                userRole={currentUser.role}
+                                patients={patientsList}
+                                />
+                            )}
                         </div>
-                        )}
                     </div>
                     </div>
                 )}
