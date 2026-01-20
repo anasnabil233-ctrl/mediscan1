@@ -4,11 +4,11 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 export default defineConfig(({ mode }) => {
-  // جلب المتغيرات من ملفات .env ومن النظام (Vercel)
+  // تحميل كافة المتغيرات بما فيها التي لا تبدأ بـ VITE_ من النظام (Vercel)
   const env = loadEnv(mode, (process as any).cwd(), '');
   
-  // دمج المتغيرات التي قد تكون باسم API_KEY أو VITE_API_KEY
-  const actualApiKey = env.VITE_API_KEY || env.API_KEY || (process as any).env.API_KEY || '';
+  // اختيار المفتاح المتاح (الأولوية لـ VITE_ ثم العادي)
+  const actualApiKey = env.VITE_API_KEY || env.API_KEY || '';
 
   return {
     plugins: [
@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
     ],
     base: './',
     define: {
-      // حقن المتغيرات بشكل مباشر ليتم استبدالها في كود المتصفح أثناء عملية البناء
+      // حقن المفتاح بشكل صارم ليتم استبداله في الملفات أثناء الـ Build
       'process.env.API_KEY': JSON.stringify(actualApiKey),
       'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
       'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || ''),
